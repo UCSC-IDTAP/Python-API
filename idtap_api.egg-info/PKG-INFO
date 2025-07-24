@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: idtap-api
-Version: 0.1.2
+Version: 0.1.3
 Summary: Python client library for IDTAP - Interactive Digital Transcription and Analysis Platform for Hindustani music
 Author-email: Jon Myers <jon@swara.studio>
 Maintainer-email: Jon Myers <jon@swara.studio>
@@ -26,7 +26,7 @@ Requires-Python: >=3.10
 Description-Content-Type: text/markdown
 License-File: LICENSE
 Requires-Dist: requests>=2.31.0
-Requires-Dist: requests-toolbelt>=1.0.1
+Requires-Dist: requests-toolbelt>=1.0.0
 Requires-Dist: pyhumps>=3.8.0
 Requires-Dist: keyring>=24.0.0
 Requires-Dist: cryptography>=41.0.0
