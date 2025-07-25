@@ -1,6 +1,7 @@
 # IDTAP Python API
 
 [![PyPI version](https://badge.fury.io/py/idtap-api.svg)](https://badge.fury.io/py/idtap-api)
+[![Documentation Status](https://readthedocs.org/projects/idtap-api/badge/?version=latest)](https://idtap-api.readthedocs.io/en/latest/?badge=latest)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -295,9 +296,19 @@ python api_testing/api_test.py
 - **Source Code**: [github.com/jon-myers/idtap](https://github.com/jon-myers/idtap)
 - **Research Paper**: "Beyond Notation: A Digital Platform for Transcribing and Analyzing Oral Melodic Traditions" (ISMIR 2025)
 
+## Documentation
+
+📖 **Complete documentation is available at [idtap-api.readthedocs.io](https://idtap-api.readthedocs.io/)**
+
+- **[Installation Guide](https://idtap-api.readthedocs.io/en/latest/installation.html)** - Detailed setup instructions
+- **[Authentication](https://idtap-api.readthedocs.io/en/latest/authentication.html)** - OAuth setup and token management
+- **[Quickstart Tutorial](https://idtap-api.readthedocs.io/en/latest/quickstart.html)** - Get started in minutes
+- **[API Reference](https://idtap-api.readthedocs.io/en/latest/api/)** - Complete class and method documentation
+- **[Examples](https://idtap-api.readthedocs.io/en/latest/examples/)** - Real-world usage examples
+
 ## Support
 
-- **GitHub Issues**: [Report bugs and request features](https://github.com/jon-myers/idtap/issues)
+- **GitHub Issues**: [Report bugs and request features](https://github.com/UCSC-IDTAP/Python-API/issues)
 - **Research Contact**: Jonathan Myers & Dard Neuman, UC Santa Cruz
 - **Platform**: [swara.studio](https://swara.studio)
 
