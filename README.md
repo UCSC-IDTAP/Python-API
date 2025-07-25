@@ -1,7 +1,7 @@
 # IDTAP Python API
 
 [![PyPI version](https://badge.fury.io/py/idtap-api.svg)](https://badge.fury.io/py/idtap-api)
-[![Documentation Status](https://readthedocs.org/projects/idtap-api/badge/?version=latest)](https://idtap-api.readthedocs.io/en/latest/?badge=latest)
+[![Documentation Status](https://readthedocs.org/projects/idtap-api/badge/?version=latest)](https://idtap-python-api.readthedocs.io/en/latest/?badge=latest)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -298,13 +298,13 @@ python api_testing/api_test.py
 
 ## Documentation
 
-📖 **Complete documentation is available at [idtap-api.readthedocs.io](https://idtap-api.readthedocs.io/)**
+📖 **Complete documentation is available at [idtap-python-api.readthedocs.io](https://idtap-python-api.readthedocs.io/)**
 
-- **[Installation Guide](https://idtap-api.readthedocs.io/en/latest/installation.html)** - Detailed setup instructions
-- **[Authentication](https://idtap-api.readthedocs.io/en/latest/authentication.html)** - OAuth setup and token management
-- **[Quickstart Tutorial](https://idtap-api.readthedocs.io/en/latest/quickstart.html)** - Get started in minutes
-- **[API Reference](https://idtap-api.readthedocs.io/en/latest/api/)** - Complete class and method documentation
-- **[Examples](https://idtap-api.readthedocs.io/en/latest/examples/)** - Real-world usage examples
+- **[Installation Guide](https://idtap-python-api.readthedocs.io/en/latest/installation.html)** - Detailed setup instructions
+- **[Authentication](https://idtap-python-api.readthedocs.io/en/latest/authentication.html)** - OAuth setup and token management
+- **[Quickstart Tutorial](https://idtap-python-api.readthedocs.io/en/latest/quickstart.html)** - Get started in minutes
+- **[API Reference](https://idtap-python-api.readthedocs.io/en/latest/api/)** - Complete class and method documentation
+- **[Examples](https://idtap-python-api.readthedocs.io/en/latest/examples/)** - Real-world usage examples
 
 ## Support
 
