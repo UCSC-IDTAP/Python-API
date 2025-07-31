@@ -34,6 +34,7 @@ idtap_api/classes/section.py
 idtap_api/classes/trajectory.py
 idtap_api/tests/articulation_test.py
 idtap_api/tests/assemblage_test.py
+idtap_api/tests/auth_logout_test.py
 idtap_api/tests/auth_test.py
 idtap_api/tests/automation_test.py
 idtap_api/tests/chikari_test.py
@@ -46,5 +47,4 @@ idtap_api/tests/piece_test.py
 idtap_api/tests/pitch_test.py
 idtap_api/tests/raga_test.py
 idtap_api/tests/section_test.py
-idtap_api/tests/test_logout.py
 idtap_api/tests/trajectory_test.py
