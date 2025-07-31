@@ -355,6 +355,208 @@ class Piece:
         # Update piece-level durations
         self.dur_array_from_phrases()
 
+    def add_trajectory(
+        self,
+        trajectory_data: Union[Trajectory, Dict[str, Any]], 
+        inst_track: int,
+        start_time: float
+    ) -> bool:
+        """Add a trajectory to the piece by replacing part of a silent trajectory.
+        
+        Args:
+            trajectory_data: Either a Trajectory object or dict with trajectory parameters
+            inst_track: Index of the instrument track to add the trajectory to
+            start_time: Start time in the piece (in seconds)
+            
+        Returns:
+            bool: True if trajectory was successfully added, False otherwise
+        """
+        # Validate inputs
+        if not self._validate_trajectory_addition_inputs(trajectory_data, inst_track, start_time):
+            return False
+        
+        # Prepare trajectory with piece context
+        trajectory = self._prepare_trajectory_for_addition(trajectory_data, inst_track)
+        
+        # Validate all requirements
+        if not self._validate_trajectory_addition_requirements(trajectory, inst_track, start_time):
+            return False
+        
+        # Find target phrase and silent trajectory
+        phrase, silent_traj_idx = self._find_target_location(inst_track, start_time)
+        if phrase is None or silent_traj_idx is None:
+            return False
+        
+        # Apply replacement logic
+        self._replace_silent_trajectory(phrase, silent_traj_idx, trajectory, start_time)
+        
+        # Update piece state
+        phrase.reset()
+        return True
+
+    def _validate_trajectory_addition_inputs(
+        self, 
+        trajectory_data: Union[Trajectory, Dict[str, Any]], 
+        inst_track: int, 
+        start_time: float
+    ) -> bool:
+        """Validate basic inputs for trajectory addition."""
+        if not isinstance(inst_track, int) or inst_track < 0:
+            return False
+        if not isinstance(start_time, (int, float)) or start_time < 0:
+            return False
+        if inst_track >= len(self.phrase_grid):
+            return False
+        return True
+
+    def _prepare_trajectory_for_addition(
+        self, 
+        trajectory_data: Union[Trajectory, Dict[str, Any]], 
+        inst_track: int
+    ) -> Trajectory:
+        """Convert input to Trajectory object with piece context."""
+        if isinstance(trajectory_data, Trajectory):
+            # Even for existing Trajectory objects, recreate with piece's raga/context
+            traj_dict = trajectory_data.to_json()
+        else:
+            traj_dict = dict(trajectory_data)
+        
+        # Ensure trajectory has piece context
+        traj_dict['instrumentation'] = self.instrumentation[inst_track]
+        
+        # Update pitches to use piece's raga fundamental
+        if 'pitches' in traj_dict:
+            for pitch_data in traj_dict['pitches']:
+                if isinstance(pitch_data, dict):
+                    pitch_data['fundamental'] = self.raga.fundamental
+                    pitch_data['raga'] = self.raga.to_json()
+        
+        # Set fundID12 for silent trajectories
+        if traj_dict.get('id') == 12:
+            traj_dict['fundID12'] = self.raga.fundamental
+        
+        trajectory = Trajectory(traj_dict)
+        return trajectory
+
+    def _validate_trajectory_addition_requirements(
+        self, 
+        trajectory: Trajectory, 
+        inst_track: int, 
+        start_time: float
+    ) -> bool:
+        """Validate all 5 requirements for trajectory addition."""
+        end_time = start_time + trajectory.dur_tot
+        
+        # 1. Time range must be within piece duration
+        if self.dur_tot is None:
+            self.dur_tot_from_phrases()
+        if end_time > self.dur_tot:
+            return False
+        
+        # 2. Track must be valid (already validated in inputs)
+        
+        # 3. Time range must be within a single phrase
+        phrase_idx = self.phrase_idx_from_time(start_time, inst_track)
+        phrase = self.phrase_grid[inst_track][phrase_idx]
+        phrase_start = phrase.start_time or 0
+        phrase_end = phrase_start + phrase.dur_tot
+        
+        if end_time > phrase_end:
+            return False
+        
+        # 4. Time range must be within a single trajectory
+        target_traj = self.traj_from_time(start_time, inst_track)
+        if target_traj is None:
+            return False
+        
+        # Find trajectory's absolute start time
+        traj_abs_start = phrase_start + (target_traj.start_time or 0)
+        traj_abs_end = traj_abs_start + target_traj.dur_tot
+        
+        if start_time < traj_abs_start or end_time > traj_abs_end:
+            return False
+        
+        # 5. Target trajectory must be silent (id == 12)
+        if target_traj.id != 12:
+            return False
+        
+        return True
+
+    def _find_target_location(self, inst_track: int, start_time: float) -> tuple[Optional[Phrase], Optional[int]]:
+        """Find the phrase and trajectory index for the target location."""
+        phrase_idx = self.phrase_idx_from_time(start_time, inst_track)
+        phrase = self.phrase_grid[inst_track][phrase_idx]
+        
+        # Find the trajectory index within the phrase
+        phrase_start = phrase.start_time or 0
+        relative_start_time = start_time - phrase_start
+        
+        current_time = 0.0
+        for i, traj in enumerate(phrase.trajectories):
+            traj_start = current_time
+            traj_end = current_time + traj.dur_tot
+            
+            if traj_start <= relative_start_time < traj_end:
+                return phrase, i
+            
+            current_time = traj_end
+        
+        return None, None
+
+    def _replace_silent_trajectory(
+        self, 
+        phrase: Phrase, 
+        silent_traj_idx: int, 
+        new_trajectory: Trajectory, 
+        start_time: float
+    ) -> None:
+        """Replace part or all of a silent trajectory with the new trajectory."""
+        silent_traj = phrase.trajectories[silent_traj_idx]
+        phrase_start = phrase.start_time or 0
+        silent_abs_start = phrase_start + (silent_traj.start_time or 0)
+        
+        # Calculate relative times within the silent trajectory
+        rel_start = start_time - silent_abs_start
+        rel_end = rel_start + new_trajectory.dur_tot
+        
+        trajs = phrase.trajectories
+        
+        # Determine which case we're in (from NewTrajEmit logic)
+        starts_equal = abs(rel_start) < 1e-10  # essentially zero
+        ends_equal = abs(rel_end - silent_traj.dur_tot) < 1e-10
+        
+        if starts_equal and ends_equal:
+            # Case 1: Replace entire silent trajectory
+            trajs[silent_traj_idx] = new_trajectory
+        elif starts_equal:
+            # Case 2: Replace left side of silent trajectory
+            silent_traj.dur_tot = silent_traj.dur_tot - new_trajectory.dur_tot
+            trajs.insert(silent_traj_idx, new_trajectory)
+        elif ends_equal:
+            # Case 3: Replace right side of silent trajectory
+            silent_traj.dur_tot = silent_traj.dur_tot - new_trajectory.dur_tot
+            trajs.insert(silent_traj_idx + 1, new_trajectory)
+        else:
+            # Case 4: Replace internal portion of silent trajectory
+            first_dur = rel_start
+            last_dur = silent_traj.dur_tot - rel_end
+            
+            # Shorten the original silent trajectory to the first part
+            silent_traj.dur_tot = first_dur
+            
+            # Create new silent trajectory for the remaining part
+            last_silent_traj = Trajectory({
+                'id': 12,
+                'pitches': [],
+                'dur_tot': last_dur,
+                'fundID12': self.raga.fundamental,
+                'instrumentation': self.instrumentation[self.phrase_grid.index(next(row for row in self.phrase_grid if phrase in row))]
+            })
+            
+            # Insert new trajectory and remaining silent trajectory
+            trajs.insert(silent_traj_idx + 1, new_trajectory)
+            trajs.insert(silent_traj_idx + 2, last_silent_traj)
+
     def realign_pitches(self) -> None:
         for phrases in self.phrase_grid:
             for p in phrases:
