@@ -93,7 +93,7 @@ def test_dur_calculations_and_cleanup():
 
 
 def test_piece_serialization_round_trip(tmp_path: Path):
-    fixture = Path('python/idtap_api/tests/fixtures/serialization_test.json')
+    fixture = Path('idtap_api/tests/fixtures/serialization_test.json')
     data = json.loads(fixture.read_text())
     piece = Piece.from_json(data)
     json_obj = piece.to_json()
