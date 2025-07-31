@@ -4,6 +4,7 @@ from datetime import datetime
 
 from .phrase import Phrase
 from .trajectory import Trajectory
+from .pitch import Pitch
 from .raga import Raga
 from .meter import Meter
 from ..enums import Instrument
@@ -424,12 +425,17 @@ class Piece:
         # Ensure trajectory has piece context
         traj_dict['instrumentation'] = self.instrumentation[inst_track]
         
-        # Update pitches to use piece's raga fundamental
+        # Update pitches to use piece's raga fundamental  
         if 'pitches' in traj_dict:
+            updated_pitches = []
             for pitch_data in traj_dict['pitches']:
                 if isinstance(pitch_data, dict):
                     pitch_data['fundamental'] = self.raga.fundamental
                     pitch_data['raga'] = self.raga.to_json()
+                    updated_pitches.append(Pitch(pitch_data))
+                else:
+                    updated_pitches.append(pitch_data)
+            traj_dict['pitches'] = updated_pitches
         
         # Set fundID12 for silent trajectories
         if traj_dict.get('id') == 12:

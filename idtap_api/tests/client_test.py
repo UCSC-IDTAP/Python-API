@@ -6,7 +6,7 @@ import responses
 import pytest
 import json
 
-from python.idtap_api.client import SwaraClient
+from idtap_api.client import SwaraClient
 
 BASE = 'https://swara.studio/'
 

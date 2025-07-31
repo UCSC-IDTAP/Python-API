@@ -5,7 +5,6 @@ name = "pypi"
 
 [packages]
 requests = ">=2.31.0"
-pyhumps = ">=3.8.0"
 keyring = ">=24.0.0"
 cryptography = ">=41.0.0"
 PyJWT = ">=2.8.0"
@@ -15,13 +14,14 @@ build = "*"
 twine = "*"
 requests-toolbelt = "*"
 idtap-api = {file = ".", editable = true}
+pyhumps = "*"
 
 [dev-packages]
-pytest = "*"
 responses = "*"
 black = "*"          # Code formatting
 flake8 = "*"         # Linting
 mypy = "*"           # Type checking
+pytest = "*"
 
 [requires]
 python_version = "3.13"

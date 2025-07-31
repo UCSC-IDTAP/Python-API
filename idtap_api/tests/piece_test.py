@@ -8,21 +8,21 @@ from pathlib import Path
 import pytest
 import math
 
-from python.idtap_api.classes.piece import (
+from idtap_api.classes.piece import (
     Piece,
     init_sec_categorization,
     durations_of_fixed_pitches,
 )
-from python.idtap_api.classes.phrase import Phrase
-from python.idtap_api.classes.trajectory import Trajectory
-from python.idtap_api.classes.pitch import Pitch
-from python.idtap_api.classes.raga import Raga
-from python.idtap_api.classes.articulation import Articulation
-from python.idtap_api.classes.group import Group
-from python.idtap_api.classes.chikari import Chikari
-from python.idtap_api.classes.meter import Meter
-from python.idtap_api.classes.assemblage import Assemblage
-from python.idtap_api.enums import Instrument
+from idtap_api.classes.phrase import Phrase
+from idtap_api.classes.trajectory import Trajectory
+from idtap_api.classes.pitch import Pitch
+from idtap_api.classes.raga import Raga
+from idtap_api.classes.articulation import Articulation
+from idtap_api.classes.group import Group
+from idtap_api.classes.chikari import Chikari
+from idtap_api.classes.meter import Meter
+from idtap_api.classes.assemblage import Assemblage
+from idtap_api.enums import Instrument
 from datetime import datetime
 
 
@@ -294,6 +294,219 @@ def test_section_cat_grid_expansion():
         'sectionCatGrid': [[init_sec_categorization()]],
     })
     assert len(piece.section_cat_grid[0]) == 2
+
+
+def test_add_trajectory_validation_basic():
+    """Test basic input validation for add_trajectory."""
+    piece = build_simple_piece()
+    
+    # Invalid track index
+    assert not piece.add_trajectory({'id': 0, 'dur_tot': 0.5}, -1, 0.5)
+    assert not piece.add_trajectory({'id': 0, 'dur_tot': 0.5}, 999, 0.5)
+    
+    # Invalid start time
+    assert not piece.add_trajectory({'id': 0, 'dur_tot': 0.5}, 0, -1)
+    
+    # Invalid trajectory exceeding piece duration
+    assert not piece.add_trajectory({'id': 0, 'dur_tot': 10}, 0, 0.5)
+
+
+def test_add_trajectory_replace_entire_silent():
+    """Test replacing an entire silent trajectory."""
+    raga = Raga({'fundamental': 240})
+    silent_traj = Trajectory({'id': 12, 'dur_tot': 2.0, 'fundID12': 240})
+    phrase = Phrase({'trajectories': [silent_traj], 'raga': raga})
+    piece = Piece({'phrases': [phrase], 'raga': raga, 'instrumentation': [Instrument.Sitar]})
+    
+    # Create new trajectory to add 
+    new_traj_data = {
+        'id': 0,
+        'dur_tot': 2.0,
+        'pitches': [Pitch({'swara': 's', 'fundamental': 240})]
+    }
+    
+    # Add trajectory that replaces entire silent trajectory
+    success = piece.add_trajectory(new_traj_data, 0, 0.0)
+    assert success
+    
+    # Verify replacement
+    phrase = piece.phrase_grid[0][0]
+    assert len(phrase.trajectories) == 1
+    assert phrase.trajectories[0].id == 0
+    assert phrase.trajectories[0].dur_tot == 2.0
+
+
+def test_add_trajectory_replace_left_side():
+    """Test replacing left side of silent trajectory."""
+    raga = Raga({'fundamental': 240})
+    silent_traj = Trajectory({'id': 12, 'dur_tot': 3.0, 'fundID12': 240})
+    phrase = Phrase({'trajectories': [silent_traj], 'raga': raga})
+    piece = Piece({'phrases': [phrase], 'raga': raga, 'instrumentation': [Instrument.Sitar]})
+    
+    new_traj_data = {
+        'id': 0,
+        'dur_tot': 1.0,
+        'pitches': [Pitch({'swara': 's', 'fundamental': 240})]
+    }
+    
+    # Add trajectory at beginning of silent trajectory
+    success = piece.add_trajectory(new_traj_data, 0, 0.0)
+    assert success
+    
+    # Verify replacement
+    phrase = piece.phrase_grid[0][0]
+    assert len(phrase.trajectories) == 2
+    assert phrase.trajectories[0].id == 0
+    assert phrase.trajectories[0].dur_tot == 1.0
+    assert phrase.trajectories[1].id == 12
+    assert phrase.trajectories[1].dur_tot == 2.0
+
+
+def test_add_trajectory_replace_right_side():
+    """Test replacing right side of silent trajectory."""
+    raga = Raga({'fundamental': 240})
+    silent_traj = Trajectory({'id': 12, 'dur_tot': 3.0, 'fundID12': 240})
+    phrase = Phrase({'trajectories': [silent_traj], 'raga': raga})
+    piece = Piece({'phrases': [phrase], 'raga': raga, 'instrumentation': [Instrument.Sitar]})
+    
+    new_traj_data = {
+        'id': 0,
+        'dur_tot': 1.0,
+        'pitches': [Pitch({'swara': 's', 'fundamental': 240})]
+    }
+    
+    # Add trajectory at end of silent trajectory
+    success = piece.add_trajectory(new_traj_data, 0, 2.0)
+    assert success
+    
+    # Verify replacement
+    phrase = piece.phrase_grid[0][0]
+    assert len(phrase.trajectories) == 2
+    assert phrase.trajectories[0].id == 12
+    assert phrase.trajectories[0].dur_tot == 2.0
+    assert phrase.trajectories[1].id == 0
+    assert phrase.trajectories[1].dur_tot == 1.0
+
+
+def test_add_trajectory_replace_internal():
+    """Test replacing internal portion of silent trajectory."""
+    raga = Raga({'fundamental': 240})
+    silent_traj = Trajectory({'id': 12, 'dur_tot': 5.0, 'fundID12': 240})
+    phrase = Phrase({'trajectories': [silent_traj], 'raga': raga})
+    piece = Piece({'phrases': [phrase], 'raga': raga, 'instrumentation': [Instrument.Sitar]})
+    
+    new_traj_data = {
+        'id': 0,
+        'dur_tot': 2.0,
+        'pitches': [Pitch({'swara': 's', 'fundamental': 240})]
+    }
+    
+    # Add trajectory in middle of silent trajectory
+    success = piece.add_trajectory(new_traj_data, 0, 1.5)
+    assert success
+    
+    # Verify replacement - should create 3 trajectories: first silent, new, last silent
+    phrase = piece.phrase_grid[0][0]
+    assert len(phrase.trajectories) == 3
+    assert phrase.trajectories[0].id == 12
+    assert phrase.trajectories[0].dur_tot == 1.5
+    assert phrase.trajectories[1].id == 0
+    assert phrase.trajectories[1].dur_tot == 2.0
+    assert phrase.trajectories[2].id == 12
+    assert phrase.trajectories[2].dur_tot == 1.5
+
+
+def test_add_trajectory_with_existing_trajectory_object():
+    """Test adding pre-instantiated Trajectory object with different raga."""
+    piece_raga = Raga({'fundamental': 240})
+    different_raga = Raga({'fundamental': 220})
+    
+    silent_traj = Trajectory({'id': 12, 'dur_tot': 2.0, 'fundID12': 240})
+    phrase = Phrase({'trajectories': [silent_traj], 'raga': piece_raga})
+    piece = Piece({'phrases': [phrase], 'raga': piece_raga, 'instrumentation': [Instrument.Sitar]})
+    
+    # Create trajectory with different raga
+    wrong_pitch = Pitch({'swara': 's', 'fundamental': 220, 'raga': different_raga})
+    existing_traj = Trajectory({
+        'id': 0,
+        'dur_tot': 1.0,
+        'pitches': [wrong_pitch],
+        'instrumentation': Instrument.Vocal_M  # Also wrong instrumentation
+    })
+    
+    # Add the pre-existing trajectory
+    success = piece.add_trajectory(existing_traj, 0, 0.0)
+    assert success
+    
+    # Verify the trajectory was recreated with piece's context
+    added_traj = piece.phrase_grid[0][0].trajectories[0]
+    assert added_traj.instrumentation == Instrument.Sitar  # Should match piece instrumentation
+    # Verify pitches were updated with piece's raga fundamental
+    for pitch in added_traj.pitches:
+        assert pitch.fundamental == 240  # Should match piece's raga
+
+
+def test_add_trajectory_validation_requirements():
+    """Test the 5 validation requirements."""
+    raga = Raga({'fundamental': 240})
+    
+    # Create piece with non-silent trajectory
+    non_silent_traj = Trajectory({'id': 0, 'dur_tot': 2.0})
+    phrase = Phrase({'trajectories': [non_silent_traj], 'raga': raga})
+    piece = Piece({'phrases': [phrase], 'raga': raga, 'instrumentation': [Instrument.Sitar]})
+    
+    new_traj_data = {'id': 1, 'dur_tot': 1.0}
+    
+    # Should fail - target trajectory is not silent (id != 12)
+    assert not piece.add_trajectory(new_traj_data, 0, 0.0)
+    
+    # Create piece with silent trajectory for remaining tests
+    silent_traj = Trajectory({'id': 12, 'dur_tot': 2.0, 'fundID12': 240})
+    phrase2 = Phrase({'trajectories': [silent_traj], 'raga': raga})
+    piece2 = Piece({'phrases': [phrase2], 'raga': raga, 'instrumentation': [Instrument.Sitar]})
+    
+    # Should fail - trajectory extends beyond piece duration
+    long_traj = {'id': 0, 'dur_tot': 5.0}
+    assert not piece2.add_trajectory(long_traj, 0, 0.0)
+    
+    # Should pass - valid trajectory within silent trajectory
+    valid_traj = {'id': 0, 'dur_tot': 1.0}
+    assert piece2.add_trajectory(valid_traj, 0, 0.5)
+
+
+def test_add_trajectory_multi_track():
+    """Test adding trajectories to different instrument tracks."""
+    raga = Raga({'fundamental': 240})
+    
+    # Create piece with two tracks
+    silent1 = Trajectory({'id': 12, 'dur_tot': 2.0, 'fundID12': 240})
+    silent2 = Trajectory({'id': 12, 'dur_tot': 2.0, 'fundID12': 240})
+    phrase1 = Phrase({'trajectories': [silent1], 'raga': raga})
+    phrase2 = Phrase({'trajectories': [silent2], 'raga': raga})
+    
+    piece = Piece({
+        'phraseGrid': [[phrase1], [phrase2]], 
+        'raga': raga, 
+        'instrumentation': [Instrument.Sitar, Instrument.Vocal_M]
+    })
+    
+    # Add trajectory to first track
+    traj1_data = {'id': 0, 'dur_tot': 1.0}
+    success1 = piece.add_trajectory(traj1_data, 0, 0.0)
+    assert success1
+    
+    # Add trajectory to second track
+    traj2_data = {'id': 1, 'dur_tot': 1.0}  
+    success2 = piece.add_trajectory(traj2_data, 1, 0.5)
+    assert success2
+    
+    # Verify both tracks were modified correctly
+    assert piece.phrase_grid[0][0].trajectories[0].id == 0
+    assert piece.phrase_grid[0][0].trajectories[0].instrumentation == Instrument.Sitar
+    
+    assert piece.phrase_grid[1][0].trajectories[0].id == 12
+    assert piece.phrase_grid[1][0].trajectories[1].id == 1
+    assert piece.phrase_grid[1][0].trajectories[1].instrumentation == Instrument.Vocal_M
 
 
 def test_all_pitches_no_repetition():

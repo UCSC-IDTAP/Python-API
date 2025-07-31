@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "7fcba3928e617887c8773b911ec02cfb3471f6ffdfe417ab3e676aedb041c9f9"
+            "sha256": "88e5ddff357ada003d7691942b864a3e1c20239686ba7e1fbc696ec6a91dfc93"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -307,7 +307,8 @@
         },
         "idtap-api": {
             "editable": true,
-            "file": "."
+            "file": ".",
+            "markers": "python_version >= '3.10'"
         },
         "jaraco.classes": {
             "hashes": [

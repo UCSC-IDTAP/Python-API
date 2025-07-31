@@ -4,7 +4,7 @@ import pytest
 
 sys.path.insert(0, os.path.abspath('.'))
 
-from python.idtap_api.classes.articulation import Articulation
+from idtap_api.classes.articulation import Articulation
 
 # Tests mirror src/js/tests/articulation.test.ts
 
