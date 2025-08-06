@@ -543,3 +543,407 @@ def test_model_raga_string_getters():
     assert r.solfege_strings == solfege
     assert r.pc_strings == pcs
     assert r.western_pitch_strings == western
+
+
+# Parameter validation tests
+def test_invalid_parameter_rules_instead_of_rule_set():
+    """Test that 'rules' parameter raises helpful error message."""
+    with pytest.raises(ValueError, match="Parameter 'rules' not supported. Did you mean 'rule_set'?"):
+        Raga({'name': 'Bhimpalasi', 'fundamental': 157.6, 'rules': custom_rule_set})
+
+
+def test_invalid_parameter_multiple_errors():
+    """Test multiple invalid parameters with helpful suggestions."""
+    with pytest.raises(ValueError) as exc_info:
+        Raga({'name': 'Test', 'rules': custom_rule_set, 'fundamental_freq': 200, 'invalid_param': 123})
+    
+    error_msg = str(exc_info.value)
+    assert "Parameter 'rules' not supported. Did you mean 'rule_set'?" in error_msg
+    assert "Parameter 'fundamental_freq' not supported. Did you mean 'fundamental'?" in error_msg
+    assert "Invalid parameter: 'invalid_param'" in error_msg
+    assert "Allowed parameters:" in error_msg
+
+
+def test_invalid_parameter_raga_name():
+    """Test that 'raga_name' parameter raises helpful error message."""
+    with pytest.raises(ValueError, match="Parameter 'raga_name' not supported. Did you mean 'name'?"):
+        Raga({'raga_name': 'Test', 'fundamental': 200})
+
+
+def test_invalid_parameter_base_freq():
+    """Test that 'base_freq' parameter raises helpful error message."""
+    with pytest.raises(ValueError, match="Parameter 'base_freq' not supported. Did you mean 'fundamental'?"):
+        Raga({'name': 'Test', 'base_freq': 200})
+
+
+def test_invalid_parameter_generic():
+    """Test generic invalid parameter error."""
+    with pytest.raises(ValueError) as exc_info:
+        Raga({'name': 'Test', 'unknown_param': 123, 'another_invalid': 456})
+    
+    error_msg = str(exc_info.value)
+    assert "Invalid parameter: 'unknown_param'" in error_msg
+    assert "Invalid parameter: 'another_invalid'" in error_msg
+    assert "Allowed parameters:" in error_msg
+
+
+def test_valid_parameters_work():
+    """Test that all valid parameters work correctly."""
+    # This should not raise any errors
+    raga_data = {
+        'name': 'Test Raga',
+        'fundamental': 200.0,
+        'rule_set': custom_rule_set,
+        'tuning': et_tuning,
+        'ratios': [1.0, 1.1, 1.2]
+    }
+    r = Raga(raga_data)
+    assert r.name == 'Test Raga'
+    assert r.fundamental == 200.0
+
+
+def test_empty_options_dict():
+    """Test that empty options dict works (uses defaults)."""
+    r = Raga({})
+    assert r.name == 'Yaman'
+    assert r.fundamental == 261.63
+
+
+def test_none_options():
+    """Test that None options work (uses defaults)."""
+    r = Raga(None)
+    assert r.name == 'Yaman'
+    assert r.fundamental == 261.63
+
+
+def test_camel_case_conversion():
+    """Test that camelCase parameters are converted properly."""
+    # This should work because humps.decamelize converts camelCase
+    raga_data = {
+        'name': 'Test',
+        'fundamental': 200.0,
+        'ruleSet': custom_rule_set  # camelCase version
+    }
+    r = Raga(raga_data)
+    assert r.name == 'Test'
+    assert r.fundamental == 200.0
+    assert r.rule_set == custom_rule_set
+
+
+def test_validation_issue_reproduction():
+    """Reproduce the exact issue from the bug report."""
+    # This was the problematic code that should now raise an error
+    raga_data = {
+        'name': 'Bhimpalasi',
+        'fundamental': 157.6,
+        'rules': {'sa': True, 'ga': {'lowered': True, 'raised': False}}  # Wrong parameter name
+    }
+    
+    with pytest.raises(ValueError, match="Parameter 'rules' not supported. Did you mean 'rule_set'?"):
+        Raga(raga_data)
+
+
+def test_correct_usage_after_fix():
+    """Test that the corrected usage works properly."""
+    # This is the corrected version that should work (complete rule set)
+    raga_data = {
+        'name': 'Bhimpalasi',
+        'fundamental': 157.6,
+        'rule_set': {  # Correct parameter name with complete rule set
+            'sa': True,
+            're': {'lowered': False, 'raised': True},
+            'ga': {'lowered': True, 'raised': False},  # komal ga (characteristic of Bhimpalasi)
+            'ma': {'lowered': False, 'raised': True},
+            'pa': True,
+            'dha': {'lowered': True, 'raised': False},  # komal dha (characteristic of Bhimpalasi)
+            'ni': {'lowered': True, 'raised': False}    # komal ni (characteristic of Bhimpalasi)
+        }
+    }
+    
+    raga = Raga(raga_data)
+    assert raga.name == 'Bhimpalasi'
+    assert raga.fundamental == 157.6
+    # Test that the rule set was applied correctly for Bhimpalasi characteristics
+    assert raga.rule_set['sa'] == True
+    assert raga.rule_set['ga']['lowered'] == True   # komal ga
+    assert raga.rule_set['ga']['raised'] == False
+    assert raga.rule_set['dha']['lowered'] == True  # komal dha  
+    assert raga.rule_set['ni']['lowered'] == True   # komal ni
+
+
+# Comprehensive validation tests for type errors
+def test_invalid_type_name():
+    """Test that non-string name raises TypeError."""
+    with pytest.raises(TypeError, match="Parameter 'name' must be a string"):
+        Raga({'name': 123})
+
+
+def test_invalid_type_fundamental():
+    """Test that non-numeric fundamental raises TypeError."""
+    with pytest.raises(TypeError, match="Parameter 'fundamental' must be a number"):
+        Raga({'fundamental': 'not_a_number'})
+
+
+def test_invalid_type_rule_set():
+    """Test that non-dict rule_set raises TypeError."""
+    with pytest.raises(TypeError, match="Parameter 'rule_set' must be a dict"):
+        Raga({'rule_set': 'not_a_dict'})
+
+
+def test_invalid_type_tuning():
+    """Test that non-dict tuning raises TypeError."""
+    with pytest.raises(TypeError, match="Parameter 'tuning' must be a dict"):
+        Raga({'tuning': [1, 2, 3]})
+
+
+def test_invalid_type_ratios():
+    """Test that non-list ratios raises TypeError."""
+    with pytest.raises(TypeError, match="Parameter 'ratios' must be a list"):
+        Raga({'ratios': 'not_a_list'})
+
+
+def test_invalid_ratios_non_numeric():
+    """Test that non-numeric items in ratios raises TypeError."""
+    with pytest.raises(TypeError, match="All items in 'ratios' must be numbers"):
+        Raga({'ratios': [1.0, 2.0, 'not_a_number']})
+
+
+# Value validation tests
+def test_negative_fundamental():
+    """Test that negative fundamental raises ValueError."""
+    with pytest.raises(ValueError, match="Parameter 'fundamental' must be positive"):
+        Raga({'fundamental': -100})
+
+
+def test_zero_fundamental():
+    """Test that zero fundamental raises ValueError."""
+    with pytest.raises(ValueError, match="Parameter 'fundamental' must be positive"):
+        Raga({'fundamental': 0})
+
+
+def test_fundamental_out_of_range_warning():
+    """Test that fundamental frequency outside typical range raises warning."""
+    import warnings
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        Raga({'fundamental': 50000})  # Very high frequency
+        assert len(w) == 1
+        assert "outside typical range" in str(w[0].message)
+
+
+def test_negative_ratios():
+    """Test that negative ratios raise ValueError."""
+    with pytest.raises(ValueError, match="All ratios must be positive"):
+        Raga({'ratios': [1.0, -2.0, 1.5]})
+
+
+def test_too_many_ratios():
+    """Test that too many ratios raise ValueError."""
+    with pytest.raises(ValueError, match="Too many ratios"):
+        Raga({'ratios': [1.0] * 13})  # 13 ratios, max is 12
+
+
+# rule_set structure validation tests
+def test_rule_set_missing_swaras():
+    """Test that rule_set missing required swaras raises ValueError."""
+    incomplete_rule_set = {'sa': True, 're': True}  # Missing other swaras
+    with pytest.raises(ValueError, match="rule_set missing required swaras"):
+        Raga({'rule_set': incomplete_rule_set})
+
+
+def test_rule_set_invalid_swaras():
+    """Test that rule_set with invalid swaras raises ValueError."""
+    invalid_rule_set = {
+        'sa': True, 're': True, 'ga': True, 'ma': True, 
+        'pa': True, 'dha': True, 'ni': True,
+        'invalid_swara': True  # Invalid swara
+    }
+    with pytest.raises(ValueError, match="rule_set contains invalid swaras"):
+        Raga({'rule_set': invalid_rule_set})
+
+
+def test_rule_set_sa_pa_non_boolean():
+    """Test that sa/pa with non-boolean values raise TypeError."""
+    invalid_rule_set = {
+        'sa': 'not_boolean', 're': True, 'ga': True, 'ma': True,
+        'pa': True, 'dha': True, 'ni': True
+    }
+    with pytest.raises(TypeError, match="rule_set\\['sa'\\] must be boolean"):
+        Raga({'rule_set': invalid_rule_set})
+
+
+def test_rule_set_variable_swara_invalid_type():
+    """Test that variable swaras with invalid types raise TypeError."""
+    invalid_rule_set = {
+        'sa': True, 're': 'invalid_type', 'ga': True, 'ma': True,
+        'pa': True, 'dha': True, 'ni': True
+    }
+    with pytest.raises(TypeError, match="rule_set\\['re'\\] must be boolean or dict"):
+        Raga({'rule_set': invalid_rule_set})
+
+
+def test_rule_set_variable_swara_missing_keys():
+    """Test that variable swaras missing lowered/raised keys raise ValueError."""
+    invalid_rule_set = {
+        'sa': True, 're': {'only_lowered': True}, 'ga': True, 'ma': True,
+        'pa': True, 'dha': True, 'ni': True
+    }
+    with pytest.raises(ValueError, match="rule_set\\['re'\\] missing required keys"):
+        Raga({'rule_set': invalid_rule_set})
+
+
+def test_rule_set_variable_swara_invalid_keys():
+    """Test that variable swaras with invalid keys raise ValueError."""
+    invalid_rule_set = {
+        'sa': True, 
+        're': {'lowered': True, 'raised': False, 'invalid_key': True}, 
+        'ga': True, 'ma': True, 'pa': True, 'dha': True, 'ni': True
+    }
+    with pytest.raises(ValueError, match="rule_set\\['re'\\] contains invalid keys"):
+        Raga({'rule_set': invalid_rule_set})
+
+
+def test_rule_set_variable_swara_non_boolean_values():
+    """Test that variable swaras with non-boolean values raise TypeError."""
+    invalid_rule_set = {
+        'sa': True, 
+        're': {'lowered': 'not_boolean', 'raised': True}, 
+        'ga': True, 'ma': True, 'pa': True, 'dha': True, 'ni': True
+    }
+    with pytest.raises(TypeError, match="All values in rule_set\\['re'\\] must be boolean"):
+        Raga({'rule_set': invalid_rule_set})
+
+
+# tuning structure validation tests
+def test_tuning_missing_swaras():
+    """Test that tuning missing required swaras raises ValueError."""
+    incomplete_tuning = {'sa': 1.0, 're': 1.1}  # Missing other swaras
+    with pytest.raises(ValueError, match="tuning missing required swaras"):
+        Raga({'tuning': incomplete_tuning})
+
+
+def test_tuning_invalid_swaras():
+    """Test that tuning with invalid swaras raises ValueError."""
+    invalid_tuning = {
+        'sa': 1.0, 're': 1.1, 'ga': 1.2, 'ma': 1.3, 
+        'pa': 1.5, 'dha': 1.6, 'ni': 1.8,
+        'invalid_swara': 2.0  # Invalid swara
+    }
+    with pytest.raises(ValueError, match="tuning contains invalid swaras"):
+        Raga({'tuning': invalid_tuning})
+
+
+def test_tuning_sa_pa_non_numeric():
+    """Test that sa/pa with non-numeric values raise TypeError."""
+    invalid_tuning = {
+        'sa': 'not_numeric', 're': 1.1, 'ga': 1.2, 'ma': 1.3,
+        'pa': 1.5, 'dha': 1.6, 'ni': 1.8
+    }
+    with pytest.raises(TypeError, match="tuning\\['sa'\\] must be a number"):
+        Raga({'tuning': invalid_tuning})
+
+
+def test_tuning_sa_pa_negative():
+    """Test that sa/pa with negative values raise ValueError."""
+    invalid_tuning = {
+        'sa': -1.0, 're': 1.1, 'ga': 1.2, 'ma': 1.3,
+        'pa': 1.5, 'dha': 1.6, 'ni': 1.8
+    }
+    with pytest.raises(ValueError, match="tuning\\['sa'\\] must be positive"):
+        Raga({'tuning': invalid_tuning})
+
+
+def test_tuning_variable_swara_negative_numeric():
+    """Test that variable swaras with negative numeric values raise ValueError."""
+    invalid_tuning = {
+        'sa': 1.0, 're': -1.1, 'ga': 1.2, 'ma': 1.3,
+        'pa': 1.5, 'dha': 1.6, 'ni': 1.8
+    }
+    with pytest.raises(ValueError, match="tuning\\['re'\\] must be positive"):
+        Raga({'tuning': invalid_tuning})
+
+
+def test_tuning_variable_swara_invalid_type():
+    """Test that variable swaras with invalid types raise TypeError."""
+    invalid_tuning = {
+        'sa': 1.0, 're': 'invalid_type', 'ga': 1.2, 'ma': 1.3,
+        'pa': 1.5, 'dha': 1.6, 'ni': 1.8
+    }
+    with pytest.raises(TypeError, match="tuning\\['re'\\] must be number or dict"):
+        Raga({'tuning': invalid_tuning})
+
+
+def test_tuning_variable_swara_dict_missing_keys():
+    """Test that variable swaras dicts missing keys raise ValueError."""
+    invalid_tuning = {
+        'sa': 1.0, 're': {'only_lowered': 1.05}, 'ga': 1.2, 'ma': 1.3,
+        'pa': 1.5, 'dha': 1.6, 'ni': 1.8
+    }
+    with pytest.raises(ValueError, match="tuning\\['re'\\] missing required keys"):
+        Raga({'tuning': invalid_tuning})
+
+
+def test_tuning_variable_swara_dict_invalid_keys():
+    """Test that variable swaras dicts with invalid keys raise ValueError."""
+    invalid_tuning = {
+        'sa': 1.0, 
+        're': {'lowered': 1.05, 'raised': 1.1, 'invalid_key': 1.2}, 
+        'ga': 1.2, 'ma': 1.3, 'pa': 1.5, 'dha': 1.6, 'ni': 1.8
+    }
+    with pytest.raises(ValueError, match="tuning\\['re'\\] contains invalid keys"):
+        Raga({'tuning': invalid_tuning})
+
+
+def test_tuning_variable_swara_dict_non_numeric_values():
+    """Test that variable swaras dicts with non-numeric values raise TypeError."""
+    invalid_tuning = {
+        'sa': 1.0, 
+        're': {'lowered': 'not_numeric', 'raised': 1.1}, 
+        'ga': 1.2, 'ma': 1.3, 'pa': 1.5, 'dha': 1.6, 'ni': 1.8
+    }
+    with pytest.raises(TypeError, match="All values in tuning\\['re'\\] must be numbers"):
+        Raga({'tuning': invalid_tuning})
+
+
+def test_tuning_variable_swara_dict_negative_values():
+    """Test that variable swaras dicts with negative values raise ValueError."""
+    invalid_tuning = {
+        'sa': 1.0, 
+        're': {'lowered': -1.05, 'raised': 1.1}, 
+        'ga': 1.2, 'ma': 1.3, 'pa': 1.5, 'dha': 1.6, 'ni': 1.8
+    }
+    with pytest.raises(ValueError, match="All values in tuning\\['re'\\] must be positive"):
+        Raga({'tuning': invalid_tuning})
+
+
+# Test comprehensive validation - everything should work with valid complete data
+def test_complete_valid_data():
+    """Test that comprehensive valid data works without errors."""
+    valid_data = {
+        'name': 'Test Raga',
+        'fundamental': 220.0,
+        'rule_set': {
+            'sa': True,
+            're': {'lowered': True, 'raised': False},
+            'ga': {'lowered': False, 'raised': True},
+            'ma': {'lowered': True, 'raised': True},
+            'pa': True,
+            'dha': {'lowered': False, 'raised': True},
+            'ni': {'lowered': True, 'raised': False}
+        },
+        'tuning': {
+            'sa': 1.0,
+            're': {'lowered': 1.05, 'raised': 1.1},
+            'ga': {'lowered': 1.15, 'raised': 1.2},
+            'ma': {'lowered': 1.3, 'raised': 1.35},
+            'pa': 1.5,
+            'dha': {'lowered': 1.6, 'raised': 1.65},
+            'ni': {'lowered': 1.75, 'raised': 1.8}
+        },
+        'ratios': [1.0, 1.05, 1.2, 1.3, 1.35, 1.5, 1.6, 1.75]
+    }
+    
+    # This should work without any errors
+    raga = Raga(valid_data)
+    assert raga.name == 'Test Raga'
+    assert raga.fundamental == 220.0

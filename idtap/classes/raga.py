@@ -1,8 +1,9 @@
 from __future__ import annotations
-from typing import Optional, TypedDict, Dict, List, Tuple, Union
+from typing import Optional, TypedDict, Dict, List, Tuple, Union, Any
 import math
 import copy
 import humps
+import warnings
 
 from .pitch import Pitch
 
@@ -10,6 +11,21 @@ BoolObj = Dict[str, bool]
 RuleSetType = Dict[str, Union[bool, BoolObj]]
 NumObj = Dict[str, float]
 TuningType = Dict[str, Union[float, NumObj]]
+
+class RagaRule(TypedDict):
+    """Type definition for raga alteration rules."""
+    lowered: bool
+    raised: bool
+
+class RagaRuleSet(TypedDict, total=False):
+    """Type definition for complete raga rule set."""
+    sa: bool
+    re: Union[bool, RagaRule]
+    ga: Union[bool, RagaRule]
+    ma: Union[bool, RagaRule]
+    pa: bool
+    dha: Union[bool, RagaRule]
+    ni: Union[bool, RagaRule]
 
 # Default Yaman rule set
 yaman_rule_set: RuleSetType = {
@@ -43,6 +59,10 @@ class RagaOptionsType(TypedDict, total=False):
 class Raga:
     def __init__(self, options: Optional[RagaOptionsType] = None) -> None:
         opts = humps.decamelize(options or {})
+        
+        # Parameter validation
+        self._validate_parameters(opts)
+        
         self.name: str = opts.get('name', 'Yaman')
         self.fundamental: float = opts.get('fundamental', 261.63)
         self.rule_set: RuleSetType = opts.get('rule_set', yaman_rule_set)
@@ -63,6 +83,156 @@ class Raga:
                 if not isinstance(self.tuning[swara], dict):
                     self.tuning[swara] = {'lowered': 0.0, 'raised': 0.0}
                 self.tuning[swara][variant] = ratio
+
+    def _validate_parameters(self, opts: Dict[str, Any]) -> None:
+        """Validate constructor parameters and provide helpful error messages."""
+        if not opts:
+            return
+            
+        # Define allowed parameter names
+        allowed_keys = {'name', 'fundamental', 'rule_set', 'tuning', 'ratios'}
+        provided_keys = set(opts.keys())
+        invalid_keys = provided_keys - allowed_keys
+        
+        # Check for invalid parameter names
+        if invalid_keys:
+            error_messages = []
+            
+            for key in invalid_keys:
+                if key == 'rules':
+                    error_messages.append(f"Parameter '{key}' not supported. Did you mean 'rule_set'?")
+                elif key == 'fundamental_freq' or key == 'base_freq':
+                    error_messages.append(f"Parameter '{key}' not supported. Did you mean 'fundamental'?")
+                elif key == 'raga_name':
+                    error_messages.append(f"Parameter '{key}' not supported. Did you mean 'name'?")
+                else:
+                    error_messages.append(f"Invalid parameter: '{key}'")
+            
+            error_msg = "; ".join(error_messages)
+            error_msg += f". Allowed parameters: {sorted(allowed_keys)}"
+            raise ValueError(error_msg)
+        
+        # Validate parameter types and values
+        self._validate_parameter_types(opts)
+        self._validate_parameter_values(opts)
+    
+    def _validate_parameter_types(self, opts: Dict[str, Any]) -> None:
+        """Validate that all parameters have correct types."""
+        if 'name' in opts and not isinstance(opts['name'], str):
+            raise TypeError(f"Parameter 'name' must be a string, got {type(opts['name']).__name__}")
+        
+        if 'fundamental' in opts and not isinstance(opts['fundamental'], (int, float)):
+            raise TypeError(f"Parameter 'fundamental' must be a number, got {type(opts['fundamental']).__name__}")
+        
+        if 'rule_set' in opts:
+            if not isinstance(opts['rule_set'], dict):
+                raise TypeError(f"Parameter 'rule_set' must be a dict, got {type(opts['rule_set']).__name__}")
+            self._validate_rule_set_structure(opts['rule_set'])
+        
+        if 'tuning' in opts:
+            if not isinstance(opts['tuning'], dict):
+                raise TypeError(f"Parameter 'tuning' must be a dict, got {type(opts['tuning']).__name__}")
+            self._validate_tuning_structure(opts['tuning'])
+        
+        if 'ratios' in opts:
+            if not isinstance(opts['ratios'], list):
+                raise TypeError(f"Parameter 'ratios' must be a list, got {type(opts['ratios']).__name__}")
+            if not all(isinstance(r, (int, float)) for r in opts['ratios']):
+                raise TypeError("All items in 'ratios' must be numbers")
+    
+    def _validate_parameter_values(self, opts: Dict[str, Any]) -> None:
+        """Validate that parameter values are in valid ranges."""
+        if 'fundamental' in opts:
+            if opts['fundamental'] <= 0:
+                raise ValueError(f"Parameter 'fundamental' must be positive, got {opts['fundamental']}")
+            if opts['fundamental'] < 20 or opts['fundamental'] > 20000:
+                warnings.warn(f"Fundamental frequency {opts['fundamental']}Hz is outside typical range (20-20000Hz)", UserWarning)
+        
+        if 'ratios' in opts:
+            ratios = opts['ratios']
+            if any(r <= 0 for r in ratios):
+                raise ValueError("All ratios must be positive")
+            if len(ratios) > 12:
+                raise ValueError(f"Too many ratios: got {len(ratios)}, maximum is 12")
+    
+    def _validate_rule_set_structure(self, rule_set: Dict[str, Any]) -> None:
+        """Validate rule_set has correct structure."""
+        required_swaras = {'sa', 're', 'ga', 'ma', 'pa', 'dha', 'ni'}
+        provided_swaras = set(rule_set.keys())
+        
+        if not required_swaras.issubset(provided_swaras):
+            missing = required_swaras - provided_swaras
+            raise ValueError(f"rule_set missing required swaras: {sorted(missing)}")
+        
+        invalid_swaras = provided_swaras - required_swaras
+        if invalid_swaras:
+            raise ValueError(f"rule_set contains invalid swaras: {sorted(invalid_swaras)}")
+        
+        # Validate each swara entry
+        for swara, value in rule_set.items():
+            if swara in ('sa', 'pa'):
+                # sa and pa must be boolean
+                if not isinstance(value, bool):
+                    raise TypeError(f"rule_set['{swara}'] must be boolean, got {type(value).__name__}")
+            else:
+                # re, ga, ma, dha, ni can be boolean or dict with lowered/raised
+                if isinstance(value, bool):
+                    continue
+                elif isinstance(value, dict):
+                    required_keys = {'lowered', 'raised'}
+                    provided_keys = set(value.keys())
+                    if not required_keys.issubset(provided_keys):
+                        missing = required_keys - provided_keys
+                        raise ValueError(f"rule_set['{swara}'] missing required keys: {sorted(missing)}")
+                    invalid_keys = provided_keys - required_keys
+                    if invalid_keys:
+                        raise ValueError(f"rule_set['{swara}'] contains invalid keys: {sorted(invalid_keys)}")
+                    if not all(isinstance(v, bool) for v in value.values()):
+                        raise TypeError(f"All values in rule_set['{swara}'] must be boolean")
+                else:
+                    raise TypeError(f"rule_set['{swara}'] must be boolean or dict with 'lowered'/'raised' keys, got {type(value).__name__}")
+    
+    def _validate_tuning_structure(self, tuning: Dict[str, Any]) -> None:
+        """Validate tuning has correct structure."""
+        required_swaras = {'sa', 're', 'ga', 'ma', 'pa', 'dha', 'ni'}
+        provided_swaras = set(tuning.keys())
+        
+        if not required_swaras.issubset(provided_swaras):
+            missing = required_swaras - provided_swaras
+            raise ValueError(f"tuning missing required swaras: {sorted(missing)}")
+        
+        invalid_swaras = provided_swaras - required_swaras
+        if invalid_swaras:
+            raise ValueError(f"tuning contains invalid swaras: {sorted(invalid_swaras)}")
+        
+        # Validate each swara entry
+        for swara, value in tuning.items():
+            if swara in ('sa', 'pa'):
+                # sa and pa must be numbers
+                if not isinstance(value, (int, float)):
+                    raise TypeError(f"tuning['{swara}'] must be a number, got {type(value).__name__}")
+                if value <= 0:
+                    raise ValueError(f"tuning['{swara}'] must be positive, got {value}")
+            else:
+                # re, ga, ma, dha, ni can be number or dict with lowered/raised
+                if isinstance(value, (int, float)):
+                    if value <= 0:
+                        raise ValueError(f"tuning['{swara}'] must be positive, got {value}")
+                elif isinstance(value, dict):
+                    required_keys = {'lowered', 'raised'}
+                    provided_keys = set(value.keys())
+                    if not required_keys.issubset(provided_keys):
+                        missing = required_keys - provided_keys
+                        raise ValueError(f"tuning['{swara}'] missing required keys: {sorted(missing)}")
+                    invalid_keys = provided_keys - required_keys
+                    if invalid_keys:
+                        raise ValueError(f"tuning['{swara}'] contains invalid keys: {sorted(invalid_keys)}")
+                    if not all(isinstance(v, (int, float)) for v in value.values()):
+                        raise TypeError(f"All values in tuning['{swara}'] must be numbers")
+                    if any(v <= 0 for v in value.values()):
+                        raise ValueError(f"All values in tuning['{swara}'] must be positive")
+                else:
+                    raise TypeError(f"tuning['{swara}'] must be number or dict with 'lowered'/'raised' keys, got {type(value).__name__}")
 
     # ------------------------------------------------------------------
     @property
@@ -98,7 +268,7 @@ class Raga:
     @property
     def rule_set_num_pitches(self) -> int:
         count = 0
-        for key, val in self.rule_set.items():
+        for _, val in self.rule_set.items():
             if isinstance(val, bool):
                 if val:
                     count += 1
@@ -271,7 +441,7 @@ class Raga:
     def swara_objects(self) -> List[Dict[str, Union[int, bool]]]:
         objs: List[Dict[str, Union[int, bool]]] = []
         idx = 0
-        for s, val in self.rule_set.items():
+        for _, val in self.rule_set.items():
             if isinstance(val, dict):
                 if val.get('lowered'):
                     objs.append({'swara': idx, 'raised': False})
