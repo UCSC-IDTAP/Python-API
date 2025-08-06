@@ -3,9 +3,9 @@ import sys
 
 sys.path.insert(0, os.path.abspath('.'))
 
-from idtap_api.classes.note_view_phrase import NoteViewPhrase
-from idtap_api.classes.pitch import Pitch
-from idtap_api.classes.raga import Raga
+from idtap.classes.note_view_phrase import NoteViewPhrase
+from idtap.classes.pitch import Pitch
+from idtap.classes.raga import Raga
 
 
 def test_note_view_phrase_basic():

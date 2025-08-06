@@ -5,9 +5,9 @@ test_update_transcription.py
 Test downloading an existing transcription, modifying it, and saving the changes.
 """
 
-from idtap_api.client import SwaraClient
-from idtap_api.classes.piece import Piece
-from idtap_api.classes.trajectory import Trajectory
+from idtap.client import SwaraClient
+from idtap.classes.piece import Piece
+from idtap.classes.trajectory import Trajectory
 
 
 def main():

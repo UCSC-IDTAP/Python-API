@@ -1,7 +1,7 @@
 import os
 import sys
 sys.path.insert(0, os.path.abspath('.'))
-from idtap_api.classes.pitch import Pitch
+from idtap.classes.pitch import Pitch
 import math
 import pytest
 

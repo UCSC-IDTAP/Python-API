@@ -1,4 +1,4 @@
-from idtap_api.client import SwaraClient
+from idtap.client import SwaraClient
 
 s = SwaraClient()
 

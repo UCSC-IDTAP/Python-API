@@ -9,11 +9,11 @@ import random
 import uuid
 from datetime import datetime
 
-from idtap_api.client import SwaraClient
-from idtap_api.classes.piece import Piece
-from idtap_api.classes.trajectory import Trajectory
-from idtap_api.classes.phrase import Phrase
-from idtap_api.classes.pitch import Pitch
+from idtap.client import SwaraClient
+from idtap.classes.piece import Piece
+from idtap.classes.trajectory import Trajectory
+from idtap.classes.phrase import Phrase
+from idtap.classes.pitch import Pitch
 
 
 def main():

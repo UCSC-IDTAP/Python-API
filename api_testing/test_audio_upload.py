@@ -10,7 +10,7 @@ import os
 from pathlib import Path
 from datetime import datetime
 
-# Add the parent directory to Python path to import idtap_api
+# Add the parent directory to Python path to import idtap
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from idtap_api import (

@@ -2,8 +2,8 @@ import os
 import sys
 sys.path.insert(0, os.path.abspath('.'))
 
-from idtap_api.classes.chikari import Chikari
-from idtap_api.classes.pitch import Pitch
+from idtap.classes.chikari import Chikari
+from idtap.classes.pitch import Pitch
 
 # Test mirrors src/js/tests/chikari.test.ts
 

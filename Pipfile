@@ -13,7 +13,7 @@ google-auth-oauthlib = "*"
 build = "*"
 twine = "*"
 requests-toolbelt = "*"
-idtap-api = {file = ".", editable = true}
+idtap = {file = ".", editable = true}
 pyhumps = "*"
 
 [dev-packages]
@@ -27,5 +27,5 @@ pytest = "*"
 python_version = "3.13"
 
 [scripts]
-test = "pytest python/idtap_api/tests/"
+test = "pytest idtap/tests/"
 install-dev = "pipenv install --dev"

@@ -8,8 +8,8 @@ from pathlib import Path
 # Add the package to the path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from idtap_api.secure_storage import SecureTokenStorage
-from idtap_api.client import SwaraClient
+from idtap.secure_storage import SecureTokenStorage
+from idtap.client import SwaraClient
 
 
 def test_secure_storage():
@@ -173,7 +173,7 @@ if __name__ == "__main__":
         print("🎉 All tests passed! Secure storage implementation is working.")
         print("\n💡 Next steps:")
         print("   1. Install optional dependencies: pip install keyring cryptography PyJWT")
-        print("   2. Test authentication flow with: python -c \"from idtap_api.client import SwaraClient; SwaraClient()\"")
+        print("   2. Test authentication flow with: python -c \"from idtap.client import SwaraClient; SwaraClient()\"")
         print("   3. Check storage security with client.get_auth_info()")
     else:
         print("❌ Some tests failed. Check the output above for details.")

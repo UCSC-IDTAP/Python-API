@@ -1,6 +1,6 @@
-from idtap_api.client import SwaraClient
-from idtap_api.classes.piece import Piece
-from idtap_api.classes.trajectory import Trajectory
+from idtap.client import SwaraClient
+from idtap.classes.piece import Piece
+from idtap.classes.trajectory import Trajectory
 
 def test_add_trajectory():
     """Test adding a trajectory to a piece at a specific time."""

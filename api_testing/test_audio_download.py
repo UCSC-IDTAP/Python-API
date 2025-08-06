@@ -5,8 +5,8 @@ test_audio_download.py
 Test downloading audio recordings associated with transcriptions.
 """
 
-from idtap_api.client import SwaraClient
-from idtap_api.classes.piece import Piece
+from idtap.client import SwaraClient
+from idtap.classes.piece import Piece
 import os
 
 

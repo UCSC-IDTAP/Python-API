@@ -10,7 +10,7 @@ from pathlib import Path
 import requests
 import os
 
-from idtap_api.classes.piece import Piece
+from idtap.classes.piece import Piece
 
 from .auth import login_google, load_token
 from .secure_storage import SecureTokenStorage

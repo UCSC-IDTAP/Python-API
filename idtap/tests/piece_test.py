@@ -8,21 +8,21 @@ from pathlib import Path
 import pytest
 import math
 
-from idtap_api.classes.piece import (
+from idtap.classes.piece import (
     Piece,
     init_sec_categorization,
     durations_of_fixed_pitches,
 )
-from idtap_api.classes.phrase import Phrase
-from idtap_api.classes.trajectory import Trajectory
-from idtap_api.classes.pitch import Pitch
-from idtap_api.classes.raga import Raga
-from idtap_api.classes.articulation import Articulation
-from idtap_api.classes.group import Group
-from idtap_api.classes.chikari import Chikari
-from idtap_api.classes.meter import Meter
-from idtap_api.classes.assemblage import Assemblage
-from idtap_api.enums import Instrument
+from idtap.classes.phrase import Phrase
+from idtap.classes.trajectory import Trajectory
+from idtap.classes.pitch import Pitch
+from idtap.classes.raga import Raga
+from idtap.classes.articulation import Articulation
+from idtap.classes.group import Group
+from idtap.classes.chikari import Chikari
+from idtap.classes.meter import Meter
+from idtap.classes.assemblage import Assemblage
+from idtap.enums import Instrument
 from datetime import datetime
 
 
@@ -93,7 +93,7 @@ def test_dur_calculations_and_cleanup():
 
 
 def test_piece_serialization_round_trip(tmp_path: Path):
-    fixture = Path('idtap_api/tests/fixtures/serialization_test.json')
+    fixture = Path('idtap/tests/fixtures/serialization_test.json')
     data = json.loads(fixture.read_text())
     piece = Piece.from_json(data)
     json_obj = piece.to_json()

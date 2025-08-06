@@ -3,10 +3,10 @@ import sys
 
 sys.path.insert(0, os.path.abspath('.'))
 
-from idtap_api.classes.section import Section
-from idtap_api.classes.phrase import Phrase
-from idtap_api.classes.trajectory import Trajectory
-from idtap_api.classes.pitch import Pitch
+from idtap.classes.section import Section
+from idtap.classes.phrase import Phrase
+from idtap.classes.trajectory import Trajectory
+from idtap.classes.pitch import Pitch
 
 
 # Tests mirror src/ts/tests/section.test.ts

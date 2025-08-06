@@ -4,9 +4,9 @@ import pytest
 
 sys.path.insert(0, os.path.abspath('.'))
 
-from idtap_api.classes.group import Group
-from idtap_api.classes.trajectory import Trajectory
-from idtap_api.classes.pitch import Pitch
+from idtap.classes.group import Group
+from idtap.classes.trajectory import Trajectory
+from idtap.classes.pitch import Pitch
 
 # Tests mirror src/ts/tests/group.test.ts
 

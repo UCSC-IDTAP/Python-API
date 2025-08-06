@@ -6,7 +6,7 @@ import pytest
 
 sys.path.insert(0, os.path.abspath('.'))
 
-from idtap_api.classes.automation import Automation
+from idtap.classes.automation import Automation
 
 # Tests mirror src/ts/tests/automation.test.ts
 

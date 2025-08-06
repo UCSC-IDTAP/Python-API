@@ -2,14 +2,14 @@
 
 import pytest
 from unittest.mock import Mock, patch, MagicMock
-from idtap_api.client import SwaraClient
-from idtap_api.secure_storage import SecureTokenStorage
+from idtap.client import SwaraClient
+from idtap.secure_storage import SecureTokenStorage
 
 
 class TestLogoutFunctionality:
     """Test cases for the logout method."""
 
-    @patch('idtap_api.client.login_google')
+    @patch('idtap.client.login_google')
     def test_logout_success(self, mock_login):
         """Test successful logout."""
         # Mock the authentication
@@ -36,7 +36,7 @@ class TestLogoutFunctionality:
         assert client.user is None
         client.secure_storage.clear_tokens.assert_called_once()
 
-    @patch('idtap_api.client.login_google')
+    @patch('idtap.client.login_google')
     def test_logout_cancelled(self, mock_login):
         """Test logout cancellation."""
         # Mock the authentication
@@ -62,7 +62,7 @@ class TestLogoutFunctionality:
         assert client.user == {'name': 'Test User', '_id': 'test123'}
         client.secure_storage.clear_tokens.assert_not_called()
 
-    @patch('idtap_api.client.login_google')
+    @patch('idtap.client.login_google')
     def test_logout_programmatic(self, mock_login):
         """Test programmatic logout without confirmation."""
         # Mock the authentication
@@ -87,7 +87,7 @@ class TestLogoutFunctionality:
         assert client.user is None
         client.secure_storage.clear_tokens.assert_called_once()
 
-    @patch('idtap_api.client.login_google')
+    @patch('idtap.client.login_google')
     def test_logout_storage_failure(self, mock_login):
         """Test logout when storage clearing fails."""
         # Mock the authentication
@@ -110,7 +110,7 @@ class TestLogoutFunctionality:
         assert result is False
         client.secure_storage.clear_tokens.assert_called_once()
 
-    @patch('idtap_api.client.login_google')
+    @patch('idtap.client.login_google')
     def test_logout_exception_handling(self, mock_login):
         """Test logout exception handling."""
         # Mock the authentication
@@ -153,8 +153,8 @@ class TestSecureTokenStorage:
         storage = SecureTokenStorage()
         
         # Mock keyring operations
-        with patch('idtap_api.secure_storage.KEYRING_AVAILABLE', True), \
-             patch('idtap_api.secure_storage.keyring.delete_password') as mock_delete:
+        with patch('idtap.secure_storage.KEYRING_AVAILABLE', True), \
+             patch('idtap.secure_storage.keyring.delete_password') as mock_delete:
             
             result = storage.clear_tokens()
             

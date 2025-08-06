@@ -7,12 +7,12 @@ from unittest.mock import patch
 sys.path.insert(0, os.path.abspath('.'))
 
 import responses
-from idtap_api.client import SwaraClient
+from idtap.client import SwaraClient
 
 BASE = 'https://swara.studio/'
 
 @responses.activate
-@patch('idtap_api.client.SwaraClient.has_agreed_to_waiver', return_value=True)
+@patch('idtap.client.SwaraClient.has_agreed_to_waiver', return_value=True)
 def test_authorization_header(mock_waiver, tmp_path):
     # Use isolated token path to prevent loading existing tokens
     client = SwaraClient(token_path=tmp_path / 'test_token.json', auto_login=False)
@@ -26,8 +26,8 @@ def test_authorization_header(mock_waiver, tmp_path):
     assert responses.calls[0].request.headers['Authorization'] == 'Bearer abc'
 
 @responses.activate  
-@patch('idtap_api.client.SecureTokenStorage')
-@patch('idtap_api.client.SwaraClient.has_agreed_to_waiver', return_value=True)
+@patch('idtap.client.SecureTokenStorage')
+@patch('idtap.client.SwaraClient.has_agreed_to_waiver', return_value=True)
 def test_no_token_header(mock_waiver, mock_storage, tmp_path):
     # Mock storage to return no token
     mock_storage_instance = mock_storage.return_value
