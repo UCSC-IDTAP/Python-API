@@ -108,3 +108,250 @@ pipenv install package-name  # then manually add to pyproject.toml
 ```
 
 This API provides a production-ready foundation for complex musical transcription analysis with modern security practices and comprehensive testing coverage.
+
+# PyPI Publishing Guide
+
+## Quick Reference Checklist
+
+**Before ANY publish, run these commands:**
+```bash
+# 1. Fix critical bugs first (see CRITICAL FIXES section below)
+# 2. Update versions to match in BOTH files
+# 3. Run tests
+pytest idtap/tests/
+# 4. Clean build
+rm -rf dist/ build/ *.egg-info/
+# 5. Build
+python -m build
+# 6. Test upload (optional but recommended)
+python -m twine upload --repository testpypi dist/*
+# 7. Production upload
+python -m twine upload dist/*
+# 8. Tag and push
+git tag vX.X.X && git push origin vX.X.X
+```
+
+## Complete Steps to Publish New Version to PyPI
+
+### Prerequisites
+- PyPI account with API token configured
+- `build` and `twine` packages installed (`pipenv install build twine`)
+- All changes committed and pushed to GitHub
+
+### Step-by-Step Publishing Process
+
+#### 1. Update Version Numbers (CRITICAL - Must be done in both places)
+
+**A. Update `idtap/__init__.py`:**
+```python
+__version__ = "0.1.6"  # Increment from current "0.1.5"
+```
+
+**B. Update `pyproject.toml`:**
+```toml
+[project]
+version = "0.1.6"  # Must match __init__.py exactly
+```
+
+**Version Increment Rules:**
+- **Patch** (0.1.5 → 0.1.6): Bug fixes, small improvements, validation fixes
+- **Minor** (0.1.6 → 0.2.0): New features, API additions (backwards compatible)
+- **Major** (0.2.0 → 1.0.0): Breaking changes, API modifications
+
+#### 2. Update Dependencies (if needed)
+
+**A. Sync `Pipfile` and `pyproject.toml`:**
+```bash
+# If adding new packages:
+pipenv install new-package-name
+# Then manually add to pyproject.toml dependencies array
+```
+
+**B. Check dependency versions in `pyproject.toml`:**
+```toml
+dependencies = [
+    "requests>=2.31.0",
+    "pyhumps>=3.8.0",
+    # ... ensure all deps are current
+]
+```
+
+#### 3. Pre-Publishing Checks
+
+**A. Run Full Test Suite:**
+```bash
+pytest idtap/tests/  # Must pass all tests
+```
+
+**B. Test Package Installation Locally:**
+```bash
+pip install -e .  # Test editable install
+python -c "import idtap; print(idtap.__version__)"  # Verify version
+```
+
+**C. Check Package Structure:**
+```bash
+python -m build --sdist --wheel .  # Build without uploading
+# Check dist/ directory for .whl and .tar.gz files
+```
+
+#### 4. Build Package
+
+**A. Clean Previous Builds:**
+```bash
+rm -rf dist/ build/ *.egg-info/
+```
+
+**B. Build Distribution Files:**
+```bash
+python -m build
+```
+- Creates `dist/idtap-X.X.X-py3-none-any.whl` (wheel)
+- Creates `dist/idtap-X.X.X.tar.gz` (source distribution)
+
+#### 5. Test on TestPyPI (Recommended)
+
+**A. Upload to TestPyPI:**
+```bash
+python -m twine upload --repository testpypi dist/*
+```
+
+**B. Test Installation from TestPyPI:**
+```bash
+pip install --index-url https://test.pypi.org/simple/ idtap
+```
+
+**C. Verify TestPyPI Installation:**
+```bash
+python -c "import idtap; print(idtap.__version__)"
+```
+
+#### 6. Publish to Production PyPI
+
+**A. Upload to PyPI:**
+```bash
+python -m twine upload dist/*
+```
+
+**B. Verify Upload:**
+- Check https://pypi.org/project/idtap/
+- Verify new version is listed
+- Check that description/metadata displays correctly
+
+#### 7. Post-Publishing Verification
+
+**A. Test Production Installation:**
+```bash
+pip install --upgrade idtap
+python -c "import idtap; print(idtap.__version__)"
+```
+
+**B. Test Key Functionality:**
+```python
+from idtap.classes.raga import Raga
+from idtap import SwaraClient
+
+# Test that new validation works
+try:
+    Raga({'rules': {}})  # Should raise helpful error
+except ValueError as e:
+    print(f"✅ Validation working: {e}")
+```
+
+#### 8. Git Tagging and Cleanup
+
+**A. Create Git Tag:**
+```bash
+git tag v0.1.6  # Match the version number
+git push origin v0.1.6
+```
+
+**B. Clean Build Artifacts:**
+```bash
+rm -rf dist/ build/ *.egg-info/
+```
+
+### Troubleshooting Common Issues
+
+#### Version Conflicts
+- **Error**: "File already exists" on PyPI upload
+- **Fix**: Ensure version number is incremented in BOTH `__init__.py` AND `pyproject.toml`
+
+#### Package Structure Issues
+- **Error**: Import errors after installation
+- **Fix**: Check `pyproject.toml` `[tool.setuptools.packages.find]` section
+- **CURRENT BUG**: `include = ["idtap_api*"]` should be `include = ["idtap*"]`
+- **Must fix before publishing**: Package directory is `idtap/` but config looks for `idtap_api/`
+
+#### Dependency Conflicts
+- **Error**: Dependencies not installing correctly
+- **Fix**: Ensure `Pipfile` and `pyproject.toml` dependencies are exactly synchronized
+
+#### Authentication Issues
+- **Error**: 403 Forbidden on upload
+- **Fix**: Configure PyPI API token: `python -m twine configure`
+
+### PyPI Configuration Files
+
+**API Token Setup** (one-time):
+```bash
+# Create ~/.pypirc with API token
+[distutils]
+index-servers = pypi testpypi
+
+[pypi]
+username = __token__
+password = pypi-YOUR_API_TOKEN_HERE
+
+[testpypi]
+repository = https://test.pypi.org/legacy/
+username = __token__
+password = pypi-YOUR_TEST_API_TOKEN_HERE
+```
+
+### CRITICAL FIXES NEEDED BEFORE NEXT PUBLISH
+
+**❌ Version Mismatch (CRITICAL)**:
+- `pyproject.toml`: version = "0.1.5"
+- `idtap/__init__.py`: __version__ = "0.1.4"
+- **Fix**: Update `__init__.py` to "0.1.5" OR increment both to "0.1.6"
+
+**❌ Package Structure Bug (CRITICAL)**:
+- `pyproject.toml` has: `include = ["idtap_api*"]`
+- **Fix**: Change to: `include = ["idtap*"]`
+- **Why**: Package directory is `idtap/` not `idtap_api/`
+
+**❌ Package Data Config (CRITICAL)**:
+- `pyproject.toml` has: `idtap_api = ["py.typed"]`
+- **Fix**: Change to: `idtap = ["py.typed"]`
+
+### Current Package Status
+- **Package Name**: `idtap` (changed from `idtap-api`)
+- **Current Version**: `0.1.5` (in pyproject.toml), `0.1.4` (in __init__.py) - **MISMATCH!**
+- **Python Support**: >= 3.10
+- **Key Dependencies**: requests, pyhumps, keyring, cryptography, PyJWT
+
+### Post-Validation Release Notes Template
+
+For the current comprehensive validation release:
+```
+## v0.1.6 - Enhanced Parameter Validation
+
+### 🚀 New Features
+- Comprehensive parameter validation for Raga constructor
+- Helpful error messages for common parameter mistakes
+- Type validation for all constructor parameters
+- Structure validation for rule_set and tuning dictionaries
+
+### 🐛 Bug Fixes  
+- Prevents silent parameter failures that led to incorrect musical analysis
+- Fixed unused variable warnings in existing code
+
+### 🧪 Testing
+- Added 29 comprehensive validation test cases
+- All 254 tests in full suite passing
+- Tests cover every possible invalid input scenario
+
+### ⚠️ Breaking Changes
+None - fully backwards compatible with existing valid usage
+```
