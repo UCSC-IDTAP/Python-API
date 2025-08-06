@@ -3,7 +3,7 @@ Utilities
 
 Utility functions for data conversion and processing.
 
-.. currentmodule:: idtap_api.utils
+.. currentmodule:: idtap.utils
 
 Case Conversion
 ---------------
@@ -19,7 +19,7 @@ Usage Examples
 
 .. code-block:: python
 
-   from idtap_api.utils import to_camel_case, to_snake_case
+   from idtap.utils import to_camel_case, to_snake_case
    
    # Convert naming conventions
    snake_name = "phrase_number"

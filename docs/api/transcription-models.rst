@@ -3,7 +3,7 @@ Transcription Models
 
 Data models for musical transcription data.
 
-.. currentmodule:: idtap_api
+.. currentmodule:: idtap
 
 Core Models
 -----------

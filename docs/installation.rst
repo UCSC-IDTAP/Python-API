@@ -15,7 +15,7 @@ The easiest way to install the IDTAP API is using pip:
 
 .. code-block:: bash
 
-   pip install idtap-api
+   pip install idtap
 
 This will install the package and all required dependencies:
 
@@ -52,7 +52,7 @@ For development, install with optional development dependencies:
 
 .. code-block:: bash
 
-   pip install idtap-api[dev]
+   pip install idtap[dev]
 
 This includes additional packages for testing and development:
 
@@ -73,7 +73,7 @@ On Linux systems, you may need to install additional packages for secure keyring
 
 .. code-block:: bash
 
-   pip install idtap-api[linux]
+   pip install idtap[linux]
 
 This installs ``secretstorage`` for integration with the system keyring.
 
@@ -89,7 +89,7 @@ To verify your installation, run:
 
 .. code-block:: python
 
-   import idtap_api
-   print(idtap_api.__version__)
+   import idtap
+   print(idtap.__version__)
 
-This should print the installed version number (e.g., ``0.1.3``).
+This should print the installed version number (e.g., ``0.1.5``).

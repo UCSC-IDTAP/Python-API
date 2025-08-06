@@ -10,7 +10,7 @@ For most users, authentication is simple:
 
 .. code-block:: python
 
-   from idtap_api import login_google
+   from idtap import login_google
    
    # This will open your browser for Google OAuth
    login_google()
@@ -30,7 +30,7 @@ Once authenticated, create a client and start using the API:
 
 .. code-block:: python
 
-   from idtap_api import SwaraClient
+   from idtap import SwaraClient
    
    client = SwaraClient()
    transcriptions = client.get_transcriptions()
@@ -59,7 +59,7 @@ Advanced users can manage tokens programmatically:
 
 .. code-block:: python
 
-   from idtap_api.auth import get_stored_tokens, clear_stored_tokens
+   from idtap.auth import get_stored_tokens, clear_stored_tokens
    
    # Check if tokens exist
    tokens = get_stored_tokens()
@@ -81,7 +81,7 @@ If the browser doesn't open automatically:
 
 .. code-block:: python
 
-   from idtap_api import login_google
+   from idtap import login_google
    
    # Get the auth URL manually
    auth_url = login_google(open_browser=False)
@@ -103,7 +103,7 @@ If tokens appear corrupted:
 
 .. code-block:: python
 
-   from idtap_api.auth import clear_stored_tokens
+   from idtap.auth import clear_stored_tokens
    
    # Clear all stored tokens and re-authenticate  
    clear_stored_tokens()

@@ -3,7 +3,7 @@ Audio Models
 
 Data models for audio file management and metadata.
 
-.. currentmodule:: idtap_api
+.. currentmodule:: idtap
 
 Core Audio Models
 -----------------

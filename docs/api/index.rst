@@ -38,20 +38,20 @@ Quick Reference
 Main Classes
 ~~~~~~~~~~~~
 
-* :class:`idtap_api.SwaraClient` - Main API client
-* :class:`idtap_api.Piece` - Complete transcription
-* :class:`idtap_api.Phrase` - Musical phrase
-* :class:`idtap_api.Trajectory` - Pitch trajectory
-* :class:`idtap_api.Pitch` - Individual pitch point
+* :class:`idtap.SwaraClient` - Main API client
+* :class:`idtap.Piece` - Complete transcription
+* :class:`idtap.Phrase` - Musical phrase
+* :class:`idtap.Trajectory` - Pitch trajectory
+* :class:`idtap.Pitch` - Individual pitch point
 
 Authentication
 ~~~~~~~~~~~~~~
 
-* :func:`idtap_api.login_google` - Authenticate with Google OAuth
+* :func:`idtap.login_google` - Authenticate with Google OAuth
 
 Audio Management
 ~~~~~~~~~~~~~~~~
 
-* :class:`idtap_api.AudioMetadata` - Audio file metadata
-* :class:`idtap_api.AudioUploadResult` - Upload response
-* :class:`idtap_api.Musician` - Performer information
+* :class:`idtap.AudioMetadata` - Audio file metadata
+* :class:`idtap.AudioUploadResult` - Upload response
+* :class:`idtap.Musician` - Performer information

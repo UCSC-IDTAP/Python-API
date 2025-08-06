@@ -19,7 +19,7 @@ Basic usage:
 
 .. code-block:: python
 
-   from idtap_api import SwaraClient, login_google
+   from idtap import SwaraClient, login_google
    
    # Authenticate with Google OAuth
    login_google()

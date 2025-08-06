@@ -26,7 +26,7 @@ Every script starts with authentication:
 
 .. code-block:: python
 
-   from idtap_api import login_google, SwaraClient
+   from idtap import login_google, SwaraClient
    
    # One-time authentication (opens browser)
    login_google()
@@ -41,7 +41,7 @@ Typical workflow for analyzing transcriptions:
 
 .. code-block:: python
 
-   from idtap_api import Piece
+   from idtap import Piece
    
    # 1. Get available transcriptions
    transcriptions = client.get_transcriptions()
@@ -66,7 +66,7 @@ Robust error handling for API calls:
 .. code-block:: python
 
    import requests
-   from idtap_api import SwaraClient
+   from idtap import SwaraClient
    
    client = SwaraClient()
    

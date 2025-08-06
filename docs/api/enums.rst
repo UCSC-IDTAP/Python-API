@@ -3,7 +3,7 @@ Enumerations
 
 Enumeration types used throughout the API.
 
-.. currentmodule:: idtap_api
+.. currentmodule:: idtap
 
 .. autoclass:: Instrument
    :members:
@@ -15,7 +15,7 @@ Usage Examples
 
 .. code-block:: python
 
-   from idtap_api import Instrument
+   from idtap import Instrument
    
    # Available instruments
    print(Instrument.SITAR)        # "Sitar"

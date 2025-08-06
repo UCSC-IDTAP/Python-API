@@ -3,7 +3,7 @@ SwaraClient
 
 The main client class for interacting with the IDTAP API.
 
-.. currentmodule:: idtap_api
+.. currentmodule:: idtap
 
 .. autoclass:: SwaraClient
    :members:
@@ -18,7 +18,7 @@ Basic Usage
 
 .. code-block:: python
 
-   from idtap_api import SwaraClient
+   from idtap import SwaraClient
    
    client = SwaraClient()
    transcriptions = client.get_transcriptions()

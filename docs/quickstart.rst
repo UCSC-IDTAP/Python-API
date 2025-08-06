@@ -16,7 +16,7 @@ Installation and Authentication
 
    .. code-block:: python
 
-      from idtap_api import login_google
+      from idtap import login_google
       
       # Opens browser for Google OAuth
       login_google()
@@ -25,7 +25,7 @@ Installation and Authentication
 
    .. code-block:: python
 
-      from idtap_api import SwaraClient
+      from idtap import SwaraClient
       
       client = SwaraClient()
 
@@ -49,7 +49,7 @@ Load a Specific Transcription
 
 .. code-block:: python
 
-   from idtap_api import Piece
+   from idtap import Piece
    
    # Load a transcription by ID
    piece_id = "your_transcription_id_here"
@@ -85,7 +85,7 @@ Upload Audio File
 
 .. code-block:: python
 
-   from idtap_api import AudioMetadata, Musician, Location
+   from idtap import AudioMetadata, Musician, Location
    
    # Prepare metadata
    metadata = AudioMetadata(
