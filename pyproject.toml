@@ -72,10 +72,10 @@ Repository = "https://github.com/UCSC-IDTAP/Python-API"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["idtap_api*"]
+include = ["idtap*"]
 
 [tool.setuptools.package-data]
-idtap_api = ["py.typed"]
+idtap = ["py.typed"]
 
 [tool.black]
 line-length = 88

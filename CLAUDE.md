@@ -280,8 +280,8 @@ rm -rf dist/ build/ *.egg-info/
 #### Package Structure Issues
 - **Error**: Import errors after installation
 - **Fix**: Check `pyproject.toml` `[tool.setuptools.packages.find]` section
-- **CURRENT BUG**: `include = ["idtap_api*"]` should be `include = ["idtap*"]`
-- **Must fix before publishing**: Package directory is `idtap/` but config looks for `idtap_api/`
+- **Historical Issue (FIXED)**: Config used to look for `idtap_api*` but package is `idtap*`
+- **Current Status**: ✅ Fixed - now correctly configured to include `idtap*`
 
 #### Dependency Conflicts
 - **Error**: Dependencies not installing correctly
@@ -309,27 +309,15 @@ username = __token__
 password = pypi-YOUR_TEST_API_TOKEN_HERE
 ```
 
-### CRITICAL FIXES NEEDED BEFORE NEXT PUBLISH
-
-**❌ Version Mismatch (CRITICAL)**:
-- `pyproject.toml`: version = "0.1.5"
-- `idtap/__init__.py`: __version__ = "0.1.4"
-- **Fix**: Update `__init__.py` to "0.1.5" OR increment both to "0.1.6"
-
-**❌ Package Structure Bug (CRITICAL)**:
-- `pyproject.toml` has: `include = ["idtap_api*"]`
-- **Fix**: Change to: `include = ["idtap*"]`
-- **Why**: Package directory is `idtap/` not `idtap_api/`
-
-**❌ Package Data Config (CRITICAL)**:
-- `pyproject.toml` has: `idtap_api = ["py.typed"]`
-- **Fix**: Change to: `idtap = ["py.typed"]`
-
 ### Current Package Status
 - **Package Name**: `idtap` (changed from `idtap-api`)
-- **Current Version**: `0.1.5` (in pyproject.toml), `0.1.4` (in __init__.py) - **MISMATCH!**
+- **Current Version**: `0.1.5` (synced in both pyproject.toml and __init__.py) ✅
+- **Package Structure**: Fixed - now correctly includes `idtap*` instead of `idtap_api*` ✅
+- **Package Data**: Fixed - now correctly references `idtap` directory ✅
 - **Python Support**: >= 3.10
 - **Key Dependencies**: requests, pyhumps, keyring, cryptography, PyJWT
+
+**✅ All critical packaging bugs have been resolved!**
 
 ### Post-Validation Release Notes Template
 
