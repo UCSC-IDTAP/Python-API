@@ -396,6 +396,25 @@ class SwaraClient:
         """Get list of ragas in database."""
         return self._get("api/ragas")
         
+    def get_raga_rules(self, raga_name: str) -> Dict[str, Any]:
+        """Get pitch rules for a specific raga.
+        
+        Args:
+            raga_name: Name of the raga to get rules for
+            
+        Returns:
+            Dictionary containing the raga's pitch rules and updated date
+            
+        Raises:
+            ValueError: If raga_name is empty or None
+            requests.HTTPError: If raga not found or API error
+        """
+        if not raga_name:
+            raise ValueError("Raga name cannot be empty")
+            
+        params = {"name": raga_name}
+        return self._get("api/ragaRules", params)
+        
     def get_available_instruments(self, melody_only: bool = False) -> List[str]:
         """Get list of instruments in database."""
         params = {'melody': 'true'} if melody_only else {}
