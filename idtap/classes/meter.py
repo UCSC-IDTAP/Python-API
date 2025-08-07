@@ -2,6 +2,10 @@ from __future__ import annotations
 from typing import List, Dict, Optional
 from uuid import uuid4
 
+# Tempo validation constants
+MIN_TEMPO_BPM = 20  # Very slow musical pieces (e.g., some alap sections)
+MAX_TEMPO_BPM = 300  # Very fast musical pieces
+
 
 def find_closest_idxs(trials: List[float], items: List[float]) -> List[int]:
     """Return indexes of items closest to each trial (greedy)."""
@@ -131,9 +135,9 @@ class PulseStructure:
         if opts.get('tempo', 60.0) <= 0:
             raise ValueError(f"Parameter 'tempo' must be positive, got {opts['tempo']}")
         
-        if opts.get('tempo', 60.0) < 30 or opts.get('tempo', 60.0) > 300:
+        if opts.get('tempo', 60.0) < MIN_TEMPO_BPM or opts.get('tempo', 60.0) > MAX_TEMPO_BPM:
             import warnings
-            warnings.warn(f"Tempo {opts['tempo']} BPM is outside typical range (30-300 BPM)", UserWarning)
+            warnings.warn(f"Tempo {opts['tempo']} BPM is outside typical range ({MIN_TEMPO_BPM}-{MAX_TEMPO_BPM} BPM)", UserWarning)
         
         if not isinstance(opts.get('size', 4), int):
             raise TypeError(f"Parameter 'size' must be an integer, got {type(opts['size']).__name__}")
@@ -299,9 +303,9 @@ class Meter:
         if opts.get('tempo', 60.0) <= 0:
             raise ValueError(f"Parameter 'tempo' must be positive, got {opts['tempo']}")
         
-        if opts.get('tempo', 60.0) < 30 or opts.get('tempo', 60.0) > 300:
+        if opts.get('tempo', 60.0) < MIN_TEMPO_BPM or opts.get('tempo', 60.0) > MAX_TEMPO_BPM:
             import warnings
-            warnings.warn(f"Tempo {opts['tempo']} BPM is outside typical range (30-300 BPM)", UserWarning)
+            warnings.warn(f"Tempo {opts['tempo']} BPM is outside typical range ({MIN_TEMPO_BPM}-{MAX_TEMPO_BPM} BPM)", UserWarning)
         
         if 'unique_id' in opts and opts['unique_id'] is not None and not isinstance(opts['unique_id'], str):
             raise TypeError(f"Parameter 'unique_id' must be a string, got {type(opts['unique_id']).__name__}")
