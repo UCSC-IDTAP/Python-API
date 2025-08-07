@@ -5,6 +5,7 @@ import uuid
 import humps
 
 from .pitch import Pitch
+from ..constants import MIN_FUNDAMENTAL_HZ, MAX_FUNDAMENTAL_HZ
 
 
 class ChikariOptionsType(TypedDict, total=False):
@@ -76,9 +77,12 @@ class Chikari:
                 raise TypeError(f"Parameter 'fundamental' must be a number, got {type(opts['fundamental']).__name__}")
             if opts['fundamental'] <= 0:
                 raise ValueError(f"Parameter 'fundamental' must be positive, got {opts['fundamental']}")
-            if opts['fundamental'] < 20 or opts['fundamental'] > 20000:
+            if opts['fundamental'] < MIN_FUNDAMENTAL_HZ or opts['fundamental'] > MAX_FUNDAMENTAL_HZ:
                 import warnings
-                warnings.warn(f"Fundamental frequency {opts['fundamental']}Hz is outside typical range (20-20000Hz)", UserWarning)
+                warnings.warn(
+                    f"Fundamental frequency {opts['fundamental']}Hz is outside typical range ({MIN_FUNDAMENTAL_HZ}-{MAX_FUNDAMENTAL_HZ}Hz)",
+                    UserWarning
+                )
         
         if 'unique_id' in opts and opts['unique_id'] is not None:
             if not isinstance(opts['unique_id'], str):

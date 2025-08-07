@@ -43,10 +43,7 @@ class Automation:
         self._validate_parameters(opts)
         self.values: List[AutomationValueType] = []
         for v in opts.get('values', []):
-            if 'norm_time' in v:
-                nt = v['norm_time']
-            else:
-                nt = v.get('normTime')
+            nt = v['norm_time']
             val = v['value']
             self.values.append({'norm_time': nt, 'value': val})
         if len(self.values) == 0:
@@ -87,14 +84,14 @@ class Automation:
                     raise TypeError(f"values[{i}] must be a dictionary")
                 
                 # Check for required keys
-                if 'norm_time' not in value and 'normTime' not in value:
-                    raise ValueError(f"values[{i}] must have 'norm_time' or 'normTime' key")
+                if 'norm_time' not in value:
+                    raise ValueError(f"values[{i}] must have 'norm_time' key")
                 
                 if 'value' not in value:
                     raise ValueError(f"values[{i}] must have 'value' key")
                 
                 # Validate norm_time
-                norm_time = value.get('norm_time', value.get('normTime'))
+                norm_time = value['norm_time']
                 if not isinstance(norm_time, (int, float)):
                     raise TypeError(f"values[{i}]['norm_time'] must be a number, got {type(norm_time).__name__}")
                 
