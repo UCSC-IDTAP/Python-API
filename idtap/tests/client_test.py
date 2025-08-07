@@ -13,8 +13,15 @@ BASE = 'https://swara.studio/'
 @responses.activate
 def test_get_piece():
     client = SwaraClient(auto_login=False)
+    
+    # Mock the waiver check endpoint
+    waiver_endpoint = BASE + 'api/user'
+    responses.get(waiver_endpoint, json={'waiverAgreed': True}, status=200)
+    
+    # Mock the actual transcription endpoint
     endpoint = BASE + 'api/transcription/1'
     responses.get(endpoint, json={'_id': '1'}, status=200)
+    
     result = client.get_piece('1')
     assert result == {'_id': '1'}
 

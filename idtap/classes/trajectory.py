@@ -21,6 +21,9 @@ class VibObjType(TypedDict, total=False):
 class Trajectory:
     def __init__(self, options: Optional[dict] = None) -> None:
         opts = humps.decamelize(options or {})
+        
+        # Parameter validation
+        self._validate_parameters(opts)
         self.names = [
             'Fixed',
             'Bend: Simple',
@@ -256,6 +259,162 @@ class Trajectory:
 
         self.start_time: Optional[float] = opts.get('start_time')
         self.phrase_idx: Optional[int] = None
+
+    def _validate_parameters(self, opts: dict) -> None:
+        """Validate constructor parameters and provide helpful error messages."""
+        if not opts:
+            return
+            
+        # Define allowed parameter names
+        allowed_keys = {
+            'id', 'pitches', 'dur_tot', 'dur_array', 'slope', 'vib_obj', 'instrumentation',
+            'articulations', 'num', 'name', 'fund_id12', 'vowel', 'vowel_ipa', 'vowel_hindi',
+            'vowel_eng_trans', 'start_consonant', 'start_consonant_hindi', 'start_consonant_ipa',
+            'start_consonant_eng_trans', 'end_consonant', 'end_consonant_hindi', 'end_consonant_ipa',
+            'end_consonant_eng_trans', 'group_id', 'automation', 'unique_id', 'tags', 'start_time',
+            'phrase_idx'
+        }
+        provided_keys = set(opts.keys())
+        invalid_keys = provided_keys - allowed_keys
+        
+        # Check for invalid parameter names with helpful suggestions
+        if invalid_keys:
+            error_messages = []
+            
+            for key in invalid_keys:
+                if key == 'type':
+                    error_messages.append(f"Parameter '{key}' not supported. Did you mean 'id'?")
+                elif key == 'duration':
+                    error_messages.append(f"Parameter '{key}' not supported. Did you mean 'dur_tot'?")
+                elif key == 'instrument':
+                    error_messages.append(f"Parameter '{key}' not supported. Did you mean 'instrumentation'?")
+                elif key == 'duration_array':
+                    error_messages.append(f"Parameter '{key}' not supported. Did you mean 'dur_array'?")
+                elif key == 'vibrato_obj':
+                    error_messages.append(f"Parameter '{key}' not supported. Did you mean 'vib_obj'?")
+                elif key == 'fundamental_id12':
+                    error_messages.append(f"Parameter '{key}' not supported. Did you mean 'fund_id12'?")
+                else:
+                    error_messages.append(f"Invalid parameter: '{key}'")
+            
+            error_msg = "; ".join(error_messages)
+            error_msg += f". Allowed parameters: {sorted(allowed_keys)}"
+            raise ValueError(error_msg)
+        
+        # Validate parameter types and values
+        self._validate_parameter_types(opts)
+        self._validate_parameter_values(opts)
+    
+    def _validate_parameter_types(self, opts: dict) -> None:
+        """Validate that all parameters have correct types.
+        Note: Some parameters (id, pitches, dur_tot, slope, articulations) are validated 
+        by the original constructor logic which throws SyntaxError, so we skip them here."""
+        
+        # Skip parameters that are already validated by original constructor logic:
+        # - id, pitches, dur_tot, slope, articulations (validated with SyntaxError)
+        
+        if 'dur_array' in opts and opts['dur_array'] is not None:
+            if not isinstance(opts['dur_array'], list):
+                raise TypeError(f"Parameter 'dur_array' must be a list, got {type(opts['dur_array']).__name__}")
+            if not all(isinstance(d, (int, float)) for d in opts['dur_array']):
+                raise TypeError("All items in 'dur_array' must be numbers")
+        
+        if 'vib_obj' in opts and opts['vib_obj'] is not None:
+            if not isinstance(opts['vib_obj'], dict):
+                raise TypeError(f"Parameter 'vib_obj' must be a dict, got {type(opts['vib_obj']).__name__}")
+            self._validate_vib_obj_structure(opts['vib_obj'])
+        
+        if 'instrumentation' in opts and not isinstance(opts['instrumentation'], Instrument):
+            raise TypeError(f"Parameter 'instrumentation' must be an Instrument enum, got {type(opts['instrumentation']).__name__}")
+        
+        if 'start_time' in opts and opts['start_time'] is not None:
+            if not isinstance(opts['start_time'], (int, float)):
+                raise TypeError(f"Parameter 'start_time' must be a number, got {type(opts['start_time']).__name__}")
+        
+        # Validate string parameters
+        string_params = ['name', 'vowel', 'vowel_ipa', 'vowel_hindi', 'vowel_eng_trans',
+                        'start_consonant', 'start_consonant_hindi', 'start_consonant_ipa',
+                        'start_consonant_eng_trans', 'end_consonant', 'end_consonant_hindi',
+                        'end_consonant_ipa', 'end_consonant_eng_trans', 'unique_id']
+        
+        for param in string_params:
+            if param in opts and opts[param] is not None and not isinstance(opts[param], str):
+                raise TypeError(f"Parameter '{param}' must be a string, got {type(opts[param]).__name__}")
+        
+        if 'tags' in opts and not isinstance(opts['tags'], list):
+            raise TypeError(f"Parameter 'tags' must be a list, got {type(opts['tags']).__name__}")
+    
+    def _validate_parameter_values(self, opts: dict) -> None:
+        """Validate that parameter values are in valid ranges.
+        Note: Some parameters (id, dur_tot, slope) are validated by original constructor,
+        so we only do additional range checks here."""
+        
+        # Additional range validation for parameters already type-checked by original constructor
+        if 'id' in opts and isinstance(opts['id'], int):
+            if not 0 <= opts['id'] <= 13:
+                raise ValueError(f"Parameter 'id' must be between 0-13 (trajectory types), got {opts['id']}")
+        
+        if 'dur_tot' in opts and isinstance(opts['dur_tot'], (int, float)):
+            if opts['dur_tot'] <= 0:
+                raise ValueError(f"Parameter 'dur_tot' must be positive, got {opts['dur_tot']}")
+        
+        if 'dur_array' in opts and opts['dur_array'] is not None:
+            dur_array = opts['dur_array']
+            if any(d < 0 for d in dur_array):
+                raise ValueError("All values in 'dur_array' must be non-negative")
+            if len(dur_array) > 0 and sum(dur_array) == 0:
+                raise ValueError("'dur_array' cannot have all zero values")
+        
+        if 'slope' in opts and isinstance(opts['slope'], (int, float)):
+            if opts['slope'] <= 0:
+                raise ValueError(f"Parameter 'slope' must be positive, got {opts['slope']}")
+        
+        if 'start_time' in opts and opts['start_time'] is not None:
+            if opts['start_time'] < 0:
+                raise ValueError(f"Parameter 'start_time' must be non-negative, got {opts['start_time']}")
+        
+        # Validate vocal parameters are only used with vocal instruments
+        vocal_params = ['vowel', 'vowel_ipa', 'vowel_hindi', 'vowel_eng_trans',
+                       'start_consonant', 'start_consonant_hindi', 'start_consonant_ipa',
+                       'start_consonant_eng_trans', 'end_consonant', 'end_consonant_hindi',
+                       'end_consonant_ipa', 'end_consonant_eng_trans']
+        
+        has_vocal_params = any(param in opts and opts[param] is not None for param in vocal_params)
+        instrumentation = opts.get('instrumentation', Instrument.Sitar)
+        
+        if has_vocal_params and instrumentation not in (Instrument.Vocal_M, Instrument.Vocal_F):
+            import warnings
+            warnings.warn(f"Vocal parameters provided but instrumentation is {instrumentation.name}. "
+                         "Vocal parameters are typically used with Vocal_M or Vocal_F instruments.", UserWarning)
+    
+    def _validate_vib_obj_structure(self, vib_obj: dict) -> None:
+        """Validate vib_obj has correct structure."""
+        allowed_keys = {'periods', 'vert_offset', 'init_up', 'extent'}
+        provided_keys = set(vib_obj.keys())
+        invalid_keys = provided_keys - allowed_keys
+        
+        if invalid_keys:
+            raise ValueError(f"vib_obj contains invalid keys: {sorted(invalid_keys)}. "
+                           f"Allowed keys: {sorted(allowed_keys)}")
+        
+        # Validate types and values
+        if 'periods' in vib_obj:
+            if not isinstance(vib_obj['periods'], int):
+                raise TypeError("vib_obj['periods'] must be an integer")
+            if vib_obj['periods'] <= 0:
+                raise ValueError("vib_obj['periods'] must be positive")
+        
+        numeric_keys = ['vert_offset', 'extent']
+        for key in numeric_keys:
+            if key in vib_obj:
+                if not isinstance(vib_obj[key], (int, float)):
+                    raise TypeError(f"vib_obj['{key}'] must be a number")
+        
+        if 'extent' in vib_obj and vib_obj['extent'] <= 0:
+            raise ValueError("vib_obj['extent'] must be positive")
+        
+        if 'init_up' in vib_obj and not isinstance(vib_obj['init_up'], bool):
+            raise TypeError("vib_obj['init_up'] must be a boolean")
 
     # ------------------------------- properties -----------------------------
     @property

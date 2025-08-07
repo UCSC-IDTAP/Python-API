@@ -82,6 +82,9 @@ def durations_of_fixed_pitches(
 class Piece:
     def __init__(self, options: Optional[dict] = None) -> None:
         opts = options or {}
+        
+        # Parameter validation
+        self._validate_parameters(opts)
         raga_opt = opts.get("raga")
         if raga_opt is not None and not isinstance(raga_opt, Raga):
             raga_opt = Raga.from_json(raga_opt)
@@ -202,6 +205,202 @@ class Piece:
             self.dur_array_from_phrases()
         else:
             self.update_start_times()
+
+    def _validate_parameters(self, opts: dict) -> None:
+        """Validate constructor parameters and provide helpful error messages."""
+        if not opts:
+            return
+            
+        # Define allowed parameter names
+        allowed_keys = {
+            'raga', 'instrumentation', 'phraseGrid', 'phrases', 'title', 'dateCreated', 
+            'dateModified', 'location', '_id', 'audioID', 'audio_DB_ID', 'userID', 'name', 
+            'family_name', 'given_name', 'permissions', 'soloist', 'soloInstrument', 
+            'explicitPermissions', 'meters', 'sectionStartsGrid', 'sectionStarts', 
+            'sectionCatGrid', 'sectionCategorization', 'adHocSectionCatGrid', 'excerptRange', 
+            'assemblageDescriptors', 'durTot', 'durArrayGrid', 'durArray'
+        }
+        provided_keys = set(opts.keys())
+        invalid_keys = provided_keys - allowed_keys
+        
+        # Check for invalid parameter names with helpful suggestions
+        if invalid_keys:
+            error_messages = []
+            
+            for key in invalid_keys:
+                if key == 'phrases_grid' or key == 'phrase_grid':
+                    error_messages.append(f"Parameter '{key}' not supported. Did you mean 'phraseGrid'?")
+                elif key == 'audio_id':
+                    error_messages.append(f"Parameter '{key}' not supported. Did you mean 'audioID'?")
+                elif key == 'user_id':
+                    error_messages.append(f"Parameter '{key}' not supported. Did you mean 'userID'?")
+                elif key == 'duration_total' or key == 'dur_total':
+                    error_messages.append(f"Parameter '{key}' not supported. Did you mean 'durTot'?")
+                elif key == 'duration_array_grid':
+                    error_messages.append(f"Parameter '{key}' not supported. Did you mean 'durArrayGrid'?")
+                elif key == 'section_starts_grid':
+                    error_messages.append(f"Parameter '{key}' not supported. Did you mean 'sectionStartsGrid'?")
+                elif key == 'explicit_permissions':
+                    error_messages.append(f"Parameter '{key}' not supported. Did you mean 'explicitPermissions'?")
+                elif key == 'solo_instrument':
+                    error_messages.append(f"Parameter '{key}' not supported. Did you mean 'soloInstrument'?")
+                else:
+                    error_messages.append(f"Invalid parameter: '{key}'")
+            
+            error_msg = "; ".join(error_messages)
+            error_msg += f". Allowed parameters: {sorted(allowed_keys)}"
+            raise ValueError(error_msg)
+        
+        # Validate parameter types and values
+        self._validate_parameter_types(opts)
+        self._validate_parameter_values(opts)
+    
+    def _validate_parameter_types(self, opts: dict) -> None:
+        """Validate that all parameters have correct types."""
+        if 'raga' in opts and opts['raga'] is not None and not isinstance(opts['raga'], (Raga, dict)):
+            raise TypeError(f"Parameter 'raga' must be a Raga object or dict, got {type(opts['raga']).__name__}")
+        
+        if 'instrumentation' in opts:
+            if not isinstance(opts['instrumentation'], list):
+                raise TypeError(f"Parameter 'instrumentation' must be a list, got {type(opts['instrumentation']).__name__}")
+        
+        if 'phraseGrid' in opts:
+            if not isinstance(opts['phraseGrid'], list):
+                raise TypeError(f"Parameter 'phraseGrid' must be a list, got {type(opts['phraseGrid']).__name__}")
+            if not all(isinstance(row, list) for row in opts['phraseGrid']):
+                raise TypeError("All items in 'phraseGrid' must be lists")
+        
+        if 'phrases' in opts:
+            if not isinstance(opts['phrases'], list):
+                raise TypeError(f"Parameter 'phrases' must be a list, got {type(opts['phrases']).__name__}")
+        
+        if 'title' in opts and not isinstance(opts['title'], str):
+            raise TypeError(f"Parameter 'title' must be a string, got {type(opts['title']).__name__}")
+        
+        if 'meters' in opts:
+            if not isinstance(opts['meters'], list):
+                raise TypeError(f"Parameter 'meters' must be a list, got {type(opts['meters']).__name__}")
+        
+        if 'sectionStartsGrid' in opts:
+            if not isinstance(opts['sectionStartsGrid'], list):
+                raise TypeError(f"Parameter 'sectionStartsGrid' must be a list, got {type(opts['sectionStartsGrid']).__name__}")
+            if not all(isinstance(row, list) for row in opts['sectionStartsGrid']):
+                raise TypeError("All items in 'sectionStartsGrid' must be lists")
+            if not all(all(isinstance(item, (int, float)) for item in row) for row in opts['sectionStartsGrid']):
+                raise TypeError("All items in 'sectionStartsGrid' sublists must be numbers")
+        
+        if 'sectionStarts' in opts:
+            if not isinstance(opts['sectionStarts'], list):
+                raise TypeError(f"Parameter 'sectionStarts' must be a list, got {type(opts['sectionStarts']).__name__}")
+            if not all(isinstance(item, (int, float)) for item in opts['sectionStarts']):
+                raise TypeError("All items in 'sectionStarts' must be numbers")
+        
+        if 'sectionCatGrid' in opts and opts['sectionCatGrid'] is not None:
+            if not isinstance(opts['sectionCatGrid'], list):
+                raise TypeError(f"Parameter 'sectionCatGrid' must be a list, got {type(opts['sectionCatGrid']).__name__}")
+            if not all(isinstance(row, list) for row in opts['sectionCatGrid']):
+                raise TypeError("All items in 'sectionCatGrid' must be lists")
+        
+        if 'explicitPermissions' in opts and not isinstance(opts['explicitPermissions'], dict):
+            raise TypeError(f"Parameter 'explicitPermissions' must be a dict, got {type(opts['explicitPermissions']).__name__}")
+        
+        if 'durTot' in opts and opts['durTot'] is not None:
+            if not isinstance(opts['durTot'], (int, float)):
+                raise TypeError(f"Parameter 'durTot' must be a number, got {type(opts['durTot']).__name__}")
+        
+        if 'durArrayGrid' in opts and opts['durArrayGrid'] is not None:
+            if not isinstance(opts['durArrayGrid'], list):
+                raise TypeError(f"Parameter 'durArrayGrid' must be a list, got {type(opts['durArrayGrid']).__name__}")
+            if not all(isinstance(row, list) for row in opts['durArrayGrid']):
+                raise TypeError("All items in 'durArrayGrid' must be lists")
+            if not all(all(isinstance(item, (int, float)) for item in row) for row in opts['durArrayGrid']):
+                raise TypeError("All items in 'durArrayGrid' sublists must be numbers")
+        
+        # Validate string parameters
+        string_params = ['location', 'audioID', 'audio_DB_ID', 'userID', 'name', 
+                        'family_name', 'given_name', 'permissions', 'soloist', 'soloInstrument']
+        
+        for param in string_params:
+            if param in opts and opts[param] is not None and not isinstance(opts[param], str):
+                raise TypeError(f"Parameter '{param}' must be a string, got {type(opts[param]).__name__}")
+        
+        # Handle _id specially since it can be string or MongoDB-style dict
+        if '_id' in opts and opts['_id'] is not None:
+            if not isinstance(opts['_id'], (str, dict)):
+                raise TypeError(f"Parameter '_id' must be a string or dict, got {type(opts['_id']).__name__}")
+        
+        # Validate list parameters
+        list_params = ['assemblageDescriptors']
+        for param in list_params:
+            if param in opts and opts[param] is not None and not isinstance(opts[param], list):
+                raise TypeError(f"Parameter '{param}' must be a list, got {type(opts[param]).__name__}")
+        
+        # Handle excerptRange specially since it can be dict or list
+        if 'excerptRange' in opts and opts['excerptRange'] is not None:
+            if not isinstance(opts['excerptRange'], (list, dict)):
+                raise TypeError(f"Parameter 'excerptRange' must be a list or dict, got {type(opts['excerptRange']).__name__}")
+    
+    def _validate_parameter_values(self, opts: dict) -> None:
+        """Validate that parameter values are in valid ranges."""
+        if 'title' in opts and opts['title'] == "":
+            raise ValueError("Parameter 'title' cannot be empty")
+        
+        if 'durTot' in opts and opts['durTot'] is not None:
+            if opts['durTot'] < 0:
+                raise ValueError(f"Parameter 'durTot' must be non-negative, got {opts['durTot']}")
+        
+        if 'sectionStarts' in opts:
+            section_starts = opts['sectionStarts']
+            if any(s < 0 for s in section_starts):
+                raise ValueError("All values in 'sectionStarts' must be non-negative")
+        
+        if 'sectionStartsGrid' in opts:
+            for i, row in enumerate(opts['sectionStartsGrid']):
+                if any(s < 0 for s in row):
+                    raise ValueError(f"All values in 'sectionStartsGrid[{i}]' must be non-negative")
+        
+        if 'durArrayGrid' in opts and opts['durArrayGrid'] is not None:
+            for i, row in enumerate(opts['durArrayGrid']):
+                if any(d < 0 for d in row):
+                    raise ValueError(f"All values in 'durArrayGrid[{i}]' must be non-negative")
+                if len(row) > 0 and sum(row) == 0:
+                    raise ValueError(f"'durArrayGrid[{i}]' cannot have all zero values")
+        
+        # Validate instrumentation contains valid instruments
+        if 'instrumentation' in opts:
+            for i, inst in enumerate(opts['instrumentation']):
+                if not isinstance(inst, Instrument) and not isinstance(inst, str):
+                    raise TypeError(f"instrumentation[{i}] must be an Instrument enum or string")
+                if isinstance(inst, str):
+                    try:
+                        Instrument(inst)
+                    except ValueError:
+                        import warnings
+                        warnings.warn(f"Unknown instrument name: '{inst}'. This may cause issues with instrument-specific features.", UserWarning)
+        
+        # Validate grid structure consistency
+        if 'phraseGrid' in opts and 'instrumentation' in opts:
+            phrase_grid = opts['phraseGrid']
+            instrumentation = opts['instrumentation']
+            if len(phrase_grid) != len(instrumentation):
+                import warnings
+                warnings.warn(f"phraseGrid has {len(phrase_grid)} tracks but instrumentation has {len(instrumentation)} instruments. "
+                             "These should typically match.", UserWarning)
+        
+        # Validate explicit permissions structure
+        if 'explicitPermissions' in opts:
+            perms = opts['explicitPermissions']
+            required_keys = {'edit', 'view', 'publicView'}
+            if not required_keys.issubset(perms.keys()):
+                missing = required_keys - perms.keys()
+                raise ValueError(f"explicitPermissions missing required keys: {sorted(missing)}")
+            
+            if not isinstance(perms.get('edit'), list):
+                raise TypeError("explicitPermissions['edit'] must be a list")
+            if not isinstance(perms.get('view'), list):
+                raise TypeError("explicitPermissions['view'] must be a list")
+            if not isinstance(perms.get('publicView'), bool):
+                raise TypeError("explicitPermissions['publicView'] must be a boolean")
 
     # ------------------------------------------------------------------
     @property

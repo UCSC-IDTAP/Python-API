@@ -6,6 +6,7 @@ import humps
 import warnings
 
 from .pitch import Pitch
+from ..constants import MIN_FUNDAMENTAL_HZ, MAX_FUNDAMENTAL_HZ
 
 BoolObj = Dict[str, bool]
 RuleSetType = Dict[str, Union[bool, BoolObj]]
@@ -145,8 +146,11 @@ class Raga:
         if 'fundamental' in opts:
             if opts['fundamental'] <= 0:
                 raise ValueError(f"Parameter 'fundamental' must be positive, got {opts['fundamental']}")
-            if opts['fundamental'] < 20 or opts['fundamental'] > 20000:
-                warnings.warn(f"Fundamental frequency {opts['fundamental']}Hz is outside typical range (20-20000Hz)", UserWarning)
+            if opts['fundamental'] < MIN_FUNDAMENTAL_HZ or opts['fundamental'] > MAX_FUNDAMENTAL_HZ:
+                warnings.warn(
+                    f"Fundamental frequency {opts['fundamental']}Hz is outside typical range ({MIN_FUNDAMENTAL_HZ}-{MAX_FUNDAMENTAL_HZ}Hz)",
+                    UserWarning
+                )
         
         if 'ratios' in opts:
             ratios = opts['ratios']
