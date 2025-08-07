@@ -67,6 +67,9 @@ def init_phrase_categorization() -> PhraseCatType:
 class Phrase:
     def __init__(self, options: Optional[Dict[str, Any]] = None) -> None:
         opts = selective_decamelize(options or {})
+        
+        # Parameter validation
+        self._validate_parameters(opts)
         trajectories_in = opts.get('trajectories', [])
         self.start_time: Optional[float] = opts.get('start_time')
         self.raga: Optional[Raga] = opts.get('raga')
@@ -148,6 +151,174 @@ class Phrase:
 
         self.ad_hoc_categorization_grid: List[str] = ad_hoc_cat or []
         self.unique_id = str(unique_id or uuid.uuid4())
+
+    def _validate_parameters(self, opts: Dict[str, Any]) -> None:
+        """Validate constructor parameters and provide helpful error messages."""
+        if not opts:
+            return
+            
+        # Define allowed parameter names
+        allowed_keys = {
+            'trajectories', 'start_time', 'raga', 'instrumentation', 'trajectory_grid',
+            'chikari_grid', 'chikaris', 'groups_grid', 'categorization_grid',
+            'unique_id', 'piece_idx', 'ad_hoc_categorization_grid', 'dur_tot', 'dur_array'
+        }
+        provided_keys = set(opts.keys())
+        invalid_keys = provided_keys - allowed_keys
+        
+        # Check for invalid parameter names with helpful suggestions
+        if invalid_keys:
+            error_messages = []
+            
+            for key in invalid_keys:
+                if key == 'duration_total' or key == 'duration':
+                    error_messages.append(f"Parameter '{key}' not supported. Did you mean 'dur_tot'?")
+                elif key == 'duration_array':
+                    error_messages.append(f"Parameter '{key}' not supported. Did you mean 'dur_array'?")
+                elif key == 'start':
+                    error_messages.append(f"Parameter '{key}' not supported. Did you mean 'start_time'?")
+                elif key == 'trajectory_list' or key == 'trajs':
+                    error_messages.append(f"Parameter '{key}' not supported. Did you mean 'trajectories'?")
+                elif key == 'instruments':
+                    error_messages.append(f"Parameter '{key}' not supported. Did you mean 'instrumentation'?")
+                else:
+                    error_messages.append(f"Invalid parameter: '{key}'")
+            
+            error_msg = "; ".join(error_messages)
+            error_msg += f". Allowed parameters: {sorted(allowed_keys)}"
+            raise ValueError(error_msg)
+        
+        # Validate parameter types and values
+        self._validate_parameter_types(opts)
+        self._validate_parameter_values(opts)
+    
+    def _validate_parameter_types(self, opts: Dict[str, Any]) -> None:
+        """Validate that all parameters have correct types."""
+        if 'trajectories' in opts:
+            if not isinstance(opts['trajectories'], list):
+                raise TypeError(f"Parameter 'trajectories' must be a list, got {type(opts['trajectories']).__name__}")
+        
+        if 'start_time' in opts and opts['start_time'] is not None:
+            if not isinstance(opts['start_time'], (int, float)):
+                raise TypeError(f"Parameter 'start_time' must be a number, got {type(opts['start_time']).__name__}")
+        
+        if 'raga' in opts and opts['raga'] is not None:
+            if not isinstance(opts['raga'], (Raga, dict)):
+                raise TypeError(f"Parameter 'raga' must be a Raga object or dict, got {type(opts['raga']).__name__}")
+        
+        if 'instrumentation' in opts:
+            if not isinstance(opts['instrumentation'], list):
+                raise TypeError(f"Parameter 'instrumentation' must be a list, got {type(opts['instrumentation']).__name__}")
+            if not all(isinstance(item, str) for item in opts['instrumentation']):
+                raise TypeError("All items in 'instrumentation' must be strings")
+        
+        if 'trajectory_grid' in opts and opts['trajectory_grid'] is not None:
+            if not isinstance(opts['trajectory_grid'], list):
+                raise TypeError(f"Parameter 'trajectory_grid' must be a list, got {type(opts['trajectory_grid']).__name__}")
+            if not all(isinstance(row, list) for row in opts['trajectory_grid']):
+                raise TypeError("All items in 'trajectory_grid' must be lists")
+        
+        if 'chikari_grid' in opts and opts['chikari_grid'] is not None:
+            if not isinstance(opts['chikari_grid'], list):
+                raise TypeError(f"Parameter 'chikari_grid' must be a list, got {type(opts['chikari_grid']).__name__}")
+            if not all(isinstance(row, dict) for row in opts['chikari_grid']):
+                raise TypeError("All items in 'chikari_grid' must be dictionaries")
+        
+        if 'chikaris' in opts and opts['chikaris'] is not None:
+            if not isinstance(opts['chikaris'], dict):
+                raise TypeError(f"Parameter 'chikaris' must be a dict, got {type(opts['chikaris']).__name__}")
+        
+        if 'groups_grid' in opts and opts['groups_grid'] is not None:
+            if not isinstance(opts['groups_grid'], list):
+                raise TypeError(f"Parameter 'groups_grid' must be a list, got {type(opts['groups_grid']).__name__}")
+            if not all(isinstance(row, list) for row in opts['groups_grid']):
+                raise TypeError("All items in 'groups_grid' must be lists")
+        
+        if 'categorization_grid' in opts and opts['categorization_grid'] is not None:
+            if not isinstance(opts['categorization_grid'], list):
+                raise TypeError(f"Parameter 'categorization_grid' must be a list, got {type(opts['categorization_grid']).__name__}")
+        
+        if 'unique_id' in opts and opts['unique_id'] is not None:
+            if not isinstance(opts['unique_id'], str):
+                raise TypeError(f"Parameter 'unique_id' must be a string, got {type(opts['unique_id']).__name__}")
+        
+        if 'piece_idx' in opts and opts['piece_idx'] is not None:
+            if not isinstance(opts['piece_idx'], int):
+                raise TypeError(f"Parameter 'piece_idx' must be an integer, got {type(opts['piece_idx']).__name__}")
+        
+        if 'ad_hoc_categorization_grid' in opts and opts['ad_hoc_categorization_grid'] is not None:
+            if not isinstance(opts['ad_hoc_categorization_grid'], list):
+                raise TypeError(f"Parameter 'ad_hoc_categorization_grid' must be a list, got {type(opts['ad_hoc_categorization_grid']).__name__}")
+            if not all(isinstance(item, str) for item in opts['ad_hoc_categorization_grid']):
+                raise TypeError("All items in 'ad_hoc_categorization_grid' must be strings")
+        
+        if 'dur_tot' in opts and opts['dur_tot'] is not None:
+            if not isinstance(opts['dur_tot'], (int, float)):
+                raise TypeError(f"Parameter 'dur_tot' must be a number, got {type(opts['dur_tot']).__name__}")
+        
+        if 'dur_array' in opts and opts['dur_array'] is not None:
+            if not isinstance(opts['dur_array'], list):
+                raise TypeError(f"Parameter 'dur_array' must be a list, got {type(opts['dur_array']).__name__}")
+            if not all(isinstance(item, (int, float)) for item in opts['dur_array']):
+                raise TypeError("All items in 'dur_array' must be numbers")
+    
+    def _validate_parameter_values(self, opts: Dict[str, Any]) -> None:
+        """Validate that parameter values are in valid ranges."""
+        if 'start_time' in opts and opts['start_time'] is not None:
+            if opts['start_time'] < 0:
+                raise ValueError(f"Parameter 'start_time' must be non-negative, got {opts['start_time']}")
+        
+        if 'piece_idx' in opts and opts['piece_idx'] is not None:
+            if opts['piece_idx'] < 0:
+                raise ValueError(f"Parameter 'piece_idx' must be non-negative, got {opts['piece_idx']}")
+        
+        if 'dur_tot' in opts and opts['dur_tot'] is not None:
+            if opts['dur_tot'] <= 0:
+                raise ValueError(f"Parameter 'dur_tot' must be positive, got {opts['dur_tot']}")
+        
+        if 'dur_array' in opts and opts['dur_array'] is not None:
+            dur_array = opts['dur_array']
+            if any(d < 0 for d in dur_array):
+                raise ValueError("All values in 'dur_array' must be non-negative")
+            if len(dur_array) > 0 and sum(dur_array) == 0:
+                raise ValueError("'dur_array' cannot have all zero values")
+        
+        # Validate grid structure consistency
+        if 'trajectory_grid' in opts and 'instrumentation' in opts:
+            trajectory_grid = opts['trajectory_grid']
+            instrumentation = opts['instrumentation']
+            if len(trajectory_grid) != len(instrumentation):
+                import warnings
+                warnings.warn(f"trajectory_grid has {len(trajectory_grid)} tracks but instrumentation has {len(instrumentation)} instruments. "
+                             "These should typically match.", UserWarning)
+        
+        if 'chikari_grid' in opts and 'instrumentation' in opts:
+            chikari_grid = opts['chikari_grid']
+            instrumentation = opts['instrumentation']
+            if len(chikari_grid) != len(instrumentation):
+                import warnings
+                warnings.warn(f"chikari_grid has {len(chikari_grid)} tracks but instrumentation has {len(instrumentation)} instruments. "
+                             "These should typically match.", UserWarning)
+        
+        if 'groups_grid' in opts and 'instrumentation' in opts:
+            groups_grid = opts['groups_grid']
+            instrumentation = opts['instrumentation']
+            if len(groups_grid) != len(instrumentation):
+                import warnings
+                warnings.warn(f"groups_grid has {len(groups_grid)} tracks but instrumentation has {len(instrumentation)} instruments. "
+                             "These should typically match.", UserWarning)
+        
+        # Validate categorization grid structure
+        if 'categorization_grid' in opts and opts['categorization_grid'] is not None:
+            for i, cat in enumerate(opts['categorization_grid']):
+                if not isinstance(cat, dict):
+                    raise TypeError(f"categorization_grid[{i}] must be a dictionary")
+                required_categories = ['Phrase', 'Elaboration', 'Vocal Articulation', 'Instrumental Articulation', 'Incidental']
+                for req_cat in required_categories:
+                    if req_cat not in cat:
+                        import warnings
+                        warnings.warn(f"categorization_grid[{i}] missing category '{req_cat}'. "
+                                     "This may cause issues with phrase categorization.", UserWarning)
 
     # ------------------------------------------------------------------
     def update_fundamental(self, fundamental: float) -> None:

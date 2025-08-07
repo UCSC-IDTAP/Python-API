@@ -59,11 +59,29 @@ class Strand:
 
 class Assemblage:
     def __init__(self, instrument: Instrument, name: str, id: Optional[str] = None) -> None:
+        # Parameter validation
+        self._validate_parameters({'instrument': instrument, 'name': name, 'id': id})
         self.phrases: List[Phrase] = []
         self.strands: List[Strand] = []
         self.instrument = instrument
         self.name = name
         self.id = id or str(uuid.uuid4())
+
+    def _validate_parameters(self, opts: dict) -> None:
+        """Validate constructor parameters and provide helpful error messages."""
+        if 'instrument' in opts:
+            if not isinstance(opts['instrument'], Instrument):
+                raise TypeError(f"Parameter 'instrument' must be an Instrument enum, got {type(opts['instrument']).__name__}")
+        
+        if 'name' in opts:
+            if not isinstance(opts['name'], str):
+                raise TypeError(f"Parameter 'name' must be a string, got {type(opts['name']).__name__}")
+            if opts['name'] == "":
+                raise ValueError("Parameter 'name' cannot be empty")
+        
+        if 'id' in opts and opts['id'] is not None:
+            if not isinstance(opts['id'], str):
+                raise TypeError(f"Parameter 'id' must be a string, got {type(opts['id']).__name__}")
 
     # ------------------------------------------------------------------
     def add_strand(self, label: str, id: Optional[str] = None) -> None:

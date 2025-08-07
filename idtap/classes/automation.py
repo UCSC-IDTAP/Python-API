@@ -38,6 +38,9 @@ class AutomationOptionsType(TypedDict, total=False):
 class Automation:
     def __init__(self, options: Optional[AutomationOptionsType] = None) -> None:
         opts = humps.decamelize(options or {})
+        
+        # Parameter validation
+        self._validate_parameters(opts)
         self.values: List[AutomationValueType] = []
         for v in opts.get('values', []):
             if 'norm_time' in v:
@@ -49,6 +52,62 @@ class Automation:
         if len(self.values) == 0:
             self.values.append({'norm_time': 0.0, 'value': 1.0})
             self.values.append({'norm_time': 1.0, 'value': 1.0})
+
+    def _validate_parameters(self, opts: dict) -> None:
+        """Validate constructor parameters and provide helpful error messages."""
+        if not opts:
+            return
+            
+        # Define allowed parameter names
+        allowed_keys = {'values'}
+        provided_keys = set(opts.keys())
+        invalid_keys = provided_keys - allowed_keys
+        
+        # Check for invalid parameter names
+        if invalid_keys:
+            error_messages = []
+            
+            for key in invalid_keys:
+                if key == 'value_array' or key == 'automation_values':
+                    error_messages.append(f"Parameter '{key}' not supported. Did you mean 'values'?")
+                else:
+                    error_messages.append(f"Invalid parameter: '{key}'")
+            
+            error_msg = "; ".join(error_messages)
+            error_msg += f". Allowed parameters: {sorted(allowed_keys)}"
+            raise ValueError(error_msg)
+        
+        # Validate parameter types and values
+        if 'values' in opts:
+            if not isinstance(opts['values'], list):
+                raise TypeError(f"Parameter 'values' must be a list, got {type(opts['values']).__name__}")
+            
+            for i, value in enumerate(opts['values']):
+                if not isinstance(value, dict):
+                    raise TypeError(f"values[{i}] must be a dictionary")
+                
+                # Check for required keys
+                if 'norm_time' not in value and 'normTime' not in value:
+                    raise ValueError(f"values[{i}] must have 'norm_time' or 'normTime' key")
+                
+                if 'value' not in value:
+                    raise ValueError(f"values[{i}] must have 'value' key")
+                
+                # Validate norm_time
+                norm_time = value.get('norm_time', value.get('normTime'))
+                if not isinstance(norm_time, (int, float)):
+                    raise TypeError(f"values[{i}]['norm_time'] must be a number, got {type(norm_time).__name__}")
+                
+                if not (0.0 <= norm_time <= 1.0):
+                    raise ValueError(f"values[{i}]['norm_time'] must be between 0.0 and 1.0, got {norm_time}")
+                
+                # Validate value
+                val = value['value']
+                if not isinstance(val, (int, float)):
+                    raise TypeError(f"values[{i}]['value'] must be a number, got {type(val).__name__}")
+                
+                if not (0.0 <= val <= 1.0):
+                    raise ValueError(f"values[{i}]['value'] must be between 0.0 and 1.0, got {val}")
 
     # ------------------------------------------------------------------
     def add_value(self, norm_time: float, value: float) -> None:
