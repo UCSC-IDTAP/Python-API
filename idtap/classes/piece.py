@@ -330,10 +330,15 @@ class Piece:
                 raise TypeError(f"Parameter '_id' must be a string or dict, got {type(opts['_id']).__name__}")
         
         # Validate list parameters
-        list_params = ['excerptRange', 'assemblageDescriptors']
+        list_params = ['assemblageDescriptors']
         for param in list_params:
             if param in opts and opts[param] is not None and not isinstance(opts[param], list):
                 raise TypeError(f"Parameter '{param}' must be a list, got {type(opts[param]).__name__}")
+        
+        # Handle excerptRange specially since it can be dict or list
+        if 'excerptRange' in opts and opts['excerptRange'] is not None:
+            if not isinstance(opts['excerptRange'], (list, dict)):
+                raise TypeError(f"Parameter 'excerptRange' must be a list or dict, got {type(opts['excerptRange']).__name__}")
     
     def _validate_parameter_values(self, opts: dict) -> None:
         """Validate that parameter values are in valid ranges."""
@@ -341,8 +346,8 @@ class Piece:
             raise ValueError("Parameter 'title' cannot be empty")
         
         if 'durTot' in opts and opts['durTot'] is not None:
-            if opts['durTot'] <= 0:
-                raise ValueError(f"Parameter 'durTot' must be positive, got {opts['durTot']}")
+            if opts['durTot'] < 0:
+                raise ValueError(f"Parameter 'durTot' must be non-negative, got {opts['durTot']}")
         
         if 'sectionStarts' in opts:
             section_starts = opts['sectionStarts']

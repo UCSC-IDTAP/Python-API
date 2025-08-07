@@ -67,7 +67,8 @@ class Articulation:
             raise ValueError(error_msg)
         
         # Validate parameter types
-        string_params = ['name', 'stroke', 'hindi', 'ipa', 'eng_trans', 'stroke_nickname']
+        # Note: stroke can be various types in some contexts, so we're less strict
+        string_params = ['name', 'hindi', 'ipa', 'eng_trans', 'stroke_nickname']
         for param in string_params:
             if param in opts and opts[param] is not None and not isinstance(opts[param], str):
                 raise TypeError(f"Parameter '{param}' must be a string, got {type(opts[param]).__name__}")

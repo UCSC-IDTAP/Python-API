@@ -306,27 +306,18 @@ class Trajectory:
         self._validate_parameter_values(opts)
     
     def _validate_parameter_types(self, opts: dict) -> None:
-        """Validate that all parameters have correct types."""
-        if 'id' in opts and not isinstance(opts['id'], int):
-            raise TypeError(f"Parameter 'id' must be an integer, got {type(opts['id']).__name__}")
+        """Validate that all parameters have correct types.
+        Note: Some parameters (id, pitches, dur_tot, slope, articulations) are validated 
+        by the original constructor logic which throws SyntaxError, so we skip them here."""
         
-        if 'pitches' in opts:
-            if not isinstance(opts['pitches'], list):
-                raise TypeError(f"Parameter 'pitches' must be a list, got {type(opts['pitches']).__name__}")
-            if not all(isinstance(p, Pitch) for p in opts['pitches']):
-                raise TypeError("All items in 'pitches' must be Pitch objects")
-        
-        if 'dur_tot' in opts and not isinstance(opts['dur_tot'], (int, float)):
-            raise TypeError(f"Parameter 'dur_tot' must be a number, got {type(opts['dur_tot']).__name__}")
+        # Skip parameters that are already validated by original constructor logic:
+        # - id, pitches, dur_tot, slope, articulations (validated with SyntaxError)
         
         if 'dur_array' in opts and opts['dur_array'] is not None:
             if not isinstance(opts['dur_array'], list):
                 raise TypeError(f"Parameter 'dur_array' must be a list, got {type(opts['dur_array']).__name__}")
             if not all(isinstance(d, (int, float)) for d in opts['dur_array']):
                 raise TypeError("All items in 'dur_array' must be numbers")
-        
-        if 'slope' in opts and not isinstance(opts['slope'], (int, float)):
-            raise TypeError(f"Parameter 'slope' must be a number, got {type(opts['slope']).__name__}")
         
         if 'vib_obj' in opts and opts['vib_obj'] is not None:
             if not isinstance(opts['vib_obj'], dict):
@@ -335,10 +326,6 @@ class Trajectory:
         
         if 'instrumentation' in opts and not isinstance(opts['instrumentation'], Instrument):
             raise TypeError(f"Parameter 'instrumentation' must be an Instrument enum, got {type(opts['instrumentation']).__name__}")
-        
-        if 'articulations' in opts and opts['articulations'] is not None:
-            if not isinstance(opts['articulations'], dict):
-                raise TypeError(f"Parameter 'articulations' must be a dict, got {type(opts['articulations']).__name__}")
         
         if 'start_time' in opts and opts['start_time'] is not None:
             if not isinstance(opts['start_time'], (int, float)):
@@ -358,12 +345,16 @@ class Trajectory:
             raise TypeError(f"Parameter 'tags' must be a list, got {type(opts['tags']).__name__}")
     
     def _validate_parameter_values(self, opts: dict) -> None:
-        """Validate that parameter values are in valid ranges."""
-        if 'id' in opts:
+        """Validate that parameter values are in valid ranges.
+        Note: Some parameters (id, dur_tot, slope) are validated by original constructor,
+        so we only do additional range checks here."""
+        
+        # Additional range validation for parameters already type-checked by original constructor
+        if 'id' in opts and isinstance(opts['id'], int):
             if not 0 <= opts['id'] <= 13:
                 raise ValueError(f"Parameter 'id' must be between 0-13 (trajectory types), got {opts['id']}")
         
-        if 'dur_tot' in opts:
+        if 'dur_tot' in opts and isinstance(opts['dur_tot'], (int, float)):
             if opts['dur_tot'] <= 0:
                 raise ValueError(f"Parameter 'dur_tot' must be positive, got {opts['dur_tot']}")
         
@@ -374,7 +365,7 @@ class Trajectory:
             if len(dur_array) > 0 and sum(dur_array) == 0:
                 raise ValueError("'dur_array' cannot have all zero values")
         
-        if 'slope' in opts:
+        if 'slope' in opts and isinstance(opts['slope'], (int, float)):
             if opts['slope'] <= 0:
                 raise ValueError(f"Parameter 'slope' must be positive, got {opts['slope']}")
         
