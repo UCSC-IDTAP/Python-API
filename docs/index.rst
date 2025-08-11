@@ -13,7 +13,7 @@ Install the package from PyPI:
 
 .. code-block:: bash
 
-   pip install idtap-api
+   pip install idtap
 
 Basic usage:
 

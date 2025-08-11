@@ -39,7 +39,7 @@ pip install secretstorage  # For better Linux keyring support
 
 ### Basic Usage (Automatic)
 ```python
-from idtap_api.client import SwaraClient
+from idtap.client import SwaraClient
 
 # Client automatically uses secure storage
 client = SwaraClient()
@@ -51,8 +51,8 @@ print(f"Security level: {auth_info['storage_info']['security_level']}")
 
 ### Advanced Usage (Manual Storage Management)
 ```python
-from idtap_api.secure_storage import SecureTokenStorage
-from idtap_api.auth import login_google, load_token
+from idtap.secure_storage import SecureTokenStorage
+from idtap.auth import login_google, load_token
 
 # Create secure storage instance
 storage = SecureTokenStorage()
@@ -79,7 +79,7 @@ The system automatically migrates existing plaintext tokens to secure storage:
 
 ### Manual Migration
 ```python
-from idtap_api.secure_storage import SecureTokenStorage
+from idtap.secure_storage import SecureTokenStorage
 
 storage = SecureTokenStorage()
 success = storage.migrate_legacy_tokens()
@@ -147,7 +147,7 @@ pip install keyring cryptography
 
 **Solution**: Re-authenticate
 ```python
-from idtap_api.auth import login_google
+from idtap.auth import login_google
 login_google()  # Will overwrite expired tokens
 ```
 
@@ -161,7 +161,7 @@ python test_secure_storage.py
 
 ### Checking Current Storage Method
 ```python
-from idtap_api.client import SwaraClient
+from idtap.client import SwaraClient
 
 client = SwaraClient(auto_login=False)
 auth_info = client.get_auth_info()

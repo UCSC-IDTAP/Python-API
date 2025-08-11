@@ -311,7 +311,7 @@ password = pypi-YOUR_TEST_API_TOKEN_HERE
 
 ### Current Package Status
 - **Package Name**: `idtap` (changed from `idtap-api`)
-- **Current Version**: `0.1.5` (synced in both pyproject.toml and __init__.py) ✅
+- **Current Version**: `0.1.6` (synced in both pyproject.toml and __init__.py) ✅
 - **Package Structure**: Fixed - now correctly includes `idtap*` instead of `idtap_api*` ✅
 - **Package Data**: Fixed - now correctly references `idtap` directory ✅
 - **Python Support**: >= 3.10

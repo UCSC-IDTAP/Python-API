@@ -10,7 +10,7 @@ Installation and Authentication
 
    .. code-block:: bash
 
-      pip install idtap-api
+      pip install idtap
 
 2. **Authenticate with Google**:
 

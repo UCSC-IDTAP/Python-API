@@ -92,4 +92,4 @@ To verify your installation, run:
    import idtap
    print(idtap.__version__)
 
-This should print the installed version number (e.g., ``0.1.5``).
+This should print the installed version number (e.g., ``0.1.6``).

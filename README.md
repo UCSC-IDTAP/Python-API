@@ -1,7 +1,7 @@
 # IDTAP Python API
 
-[![PyPI version](https://badge.fury.io/py/idtap-api.svg)](https://badge.fury.io/py/idtap-api)
-[![Documentation Status](https://readthedocs.org/projects/idtap-api/badge/?version=latest)](https://idtap-python-api.readthedocs.io/en/latest/?badge=latest)
+[![PyPI version](https://badge.fury.io/py/idtap.svg)](https://badge.fury.io/py/idtap)
+[![Documentation Status](https://readthedocs.org/projects/idtap/badge/?version=latest)](https://idtap.readthedocs.io/en/latest/?badge=latest)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -27,19 +27,19 @@ IDTAP represents a paradigm shift in musical transcription and analysis. Rather 
 ## Installation
 
 ```bash
-pip install idtap-api
+pip install idtap
 ```
 
 ### Optional Dependencies
 
 For enhanced Linux keyring support:
 ```bash
-pip install idtap-api[linux]
+pip install idtap[linux]
 ```
 
 For development:
 ```bash
-pip install idtap-api[dev]
+pip install idtap[dev]
 ```
 
 ## Quick Start
@@ -47,7 +47,7 @@ pip install idtap-api[dev]
 ### Authentication & Basic Usage
 
 ```python
-from idtap_api import SwaraClient, Piece, Instrument
+from idtap import SwaraClient, Piece, Instrument
 
 # Initialize client - connects to swara.studio platform
 client = SwaraClient()  # Automatic OAuth via Google
@@ -123,7 +123,7 @@ with open("transcription.json", "wb") as f:
 ### Working with Hindustani Music Data
 
 ```python
-from idtap_api import Piece, Phrase, Trajectory, Pitch, Raga, Instrument
+from idtap import Piece, Phrase, Trajectory, Pitch, Raga, Instrument
 
 # Example: Analyze a sitar transcription
 sitar_pieces = [t for t in transcriptions if t.get('instrumentation') == 'Sitar']
@@ -225,7 +225,7 @@ if client.has_agreed_to_waiver():
 client = SwaraClient(auto_login=False)
 
 # Login manually when needed
-from idtap_api import login_google
+from idtap import login_google
 login_google()
 ```
 
@@ -270,7 +270,7 @@ print("Raga distribution:", raga_stats)
 
 ```bash
 # Unit tests
-pytest idtap_api/tests/
+pytest idtap/tests/
 
 # Integration tests (requires authentication)
 python api_testing/api_test.py
