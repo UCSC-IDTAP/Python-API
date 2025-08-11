@@ -145,6 +145,8 @@ class Piece:
             "explicitPermissions",
             {"edit": [], "view": [], "publicView": True},
         )
+        # Optional list of collection names this piece belongs to
+        self.collections: List[str] = opts.get("collections", [])
 
         self.meters: List[Meter] = []
         for m in opts.get("meters", []):
@@ -218,7 +220,7 @@ class Piece:
             'family_name', 'given_name', 'permissions', 'soloist', 'soloInstrument', 
             'explicitPermissions', 'meters', 'sectionStartsGrid', 'sectionStarts', 
             'sectionCatGrid', 'sectionCategorization', 'adHocSectionCatGrid', 'excerptRange', 
-            'assemblageDescriptors', 'durTot', 'durArrayGrid', 'durArray'
+            'assemblageDescriptors', 'collections', 'durTot', 'durArrayGrid', 'durArray'
         }
         provided_keys = set(opts.keys())
         invalid_keys = provided_keys - allowed_keys
@@ -330,10 +332,17 @@ class Piece:
                 raise TypeError(f"Parameter '_id' must be a string or dict, got {type(opts['_id']).__name__}")
         
         # Validate list parameters
-        list_params = ['assemblageDescriptors']
+        list_params = ['assemblageDescriptors', 'collections']
         for param in list_params:
             if param in opts and opts[param] is not None and not isinstance(opts[param], list):
                 raise TypeError(f"Parameter '{param}' must be a list, got {type(opts[param]).__name__}")
+        
+        # If collections provided, ensure it is a list of strings
+        if 'collections' in opts and opts['collections'] is not None:
+            if not isinstance(opts['collections'], list):
+                raise TypeError(f"Parameter 'collections' must be a list, got {type(opts['collections']).__name__}")
+            if not all(isinstance(item, str) for item in opts['collections']):
+                raise TypeError("All items in 'collections' must be strings")
         
         # Handle excerptRange specially since it can be dict or list
         if 'excerptRange' in opts and opts['excerptRange'] is not None:
@@ -1324,6 +1333,7 @@ class Piece:
             "excerptRange": self.excerpt_range,
             "adHocSectionCatGrid": self.ad_hoc_section_cat_grid,
             "assemblageDescriptors": self.assemblage_descriptors,
+            "collections": self.collections,
         }
         # drop None values so they serialize as undefined (omitted) rather than null
         return {k: v for k, v in data.items() if v is not None}
