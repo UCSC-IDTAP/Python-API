@@ -5,7 +5,7 @@ How to handle the research waiver requirement when using IDTAP Python API.
 Run this after getting the waiver error from new_user_experience.py
 """
 
-from idtap_api import SwaraClient, Piece
+from idtap import SwaraClient, Piece
 
 def main():
     """Handle waiver agreement and then proceed with analysis."""

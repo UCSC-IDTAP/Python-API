@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Quick test script to verify waiver handling works correctly."""
 
-from idtap_api import SwaraClient
+from idtap import SwaraClient
 
 def test_waiver_flow():
     """Test the waiver agreement flow."""

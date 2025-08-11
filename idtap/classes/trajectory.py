@@ -75,7 +75,8 @@ class Trajectory:
                 'extent': 0.05,
             }
         else:
-            self.vib_obj = vib_obj  # type: ignore
+            # Normalize and validate vib_obj for flexible inputs (e.g., strings)
+            self.vib_obj = self._normalize_vib_obj(vib_obj)  # type: ignore
 
         instr = opts.get('instrumentation', Instrument.Sitar)
         self.instrumentation: Instrument = instr
@@ -388,33 +389,140 @@ class Trajectory:
                          "Vocal parameters are typically used with Vocal_M or Vocal_F instruments.", UserWarning)
     
     def _validate_vib_obj_structure(self, vib_obj: dict) -> None:
-        """Validate vib_obj has correct structure."""
+        """Validate vib_obj has correct structure, allowing lenient input types.
+
+        Accepts numeric strings and floats that can be coerced to required types,
+        but does not mutate the provided dict. Actual coercion happens in
+        _normalize_vib_obj.
+        """
         allowed_keys = {'periods', 'vert_offset', 'init_up', 'extent'}
         provided_keys = set(vib_obj.keys())
         invalid_keys = provided_keys - allowed_keys
-        
+
         if invalid_keys:
-            raise ValueError(f"vib_obj contains invalid keys: {sorted(invalid_keys)}. "
-                           f"Allowed keys: {sorted(allowed_keys)}")
-        
-        # Validate types and values
+            raise ValueError(
+                f"vib_obj contains invalid keys: {sorted(invalid_keys)}. "
+                f"Allowed keys: {sorted(allowed_keys)}"
+            )
+
+        # Validate types and values (lenient)
         if 'periods' in vib_obj:
-            if not isinstance(vib_obj['periods'], int):
-                raise TypeError("vib_obj['periods'] must be an integer")
-            if vib_obj['periods'] <= 0:
-                raise ValueError("vib_obj['periods'] must be positive")
-        
-        numeric_keys = ['vert_offset', 'extent']
-        for key in numeric_keys:
+            p = vib_obj['periods']
+            if isinstance(p, int):
+                if p <= 0:
+                    raise ValueError("vib_obj['periods'] must be positive")
+            elif isinstance(p, float):
+                if p <= 0:
+                    raise ValueError("vib_obj['periods'] must be positive")
+            elif isinstance(p, str):
+                try:
+                    pf = float(p.strip())
+                except Exception as e:
+                    raise TypeError("vib_obj['periods'] must be an integer or numeric string") from e
+                if pf <= 0:
+                    raise ValueError("vib_obj['periods'] must be positive")
+            else:
+                raise TypeError("vib_obj['periods'] must be a number")
+
+        for key in ['vert_offset', 'extent']:
             if key in vib_obj:
-                if not isinstance(vib_obj[key], (int, float)):
+                v = vib_obj[key]
+                if isinstance(v, (int, float)):
+                    pass
+                elif isinstance(v, str):
+                    try:
+                        float(v.strip())
+                    except Exception as e:
+                        raise TypeError(f"vib_obj['{key}'] must be a number or numeric string") from e
+                else:
                     raise TypeError(f"vib_obj['{key}'] must be a number")
-        
-        if 'extent' in vib_obj and vib_obj['extent'] <= 0:
-            raise ValueError("vib_obj['extent'] must be positive")
-        
-        if 'init_up' in vib_obj and not isinstance(vib_obj['init_up'], bool):
-            raise TypeError("vib_obj['init_up'] must be a boolean")
+
+        if 'extent' in vib_obj:
+            try:
+                ext_val = float(vib_obj['extent'])
+            except Exception:
+                # If not coercible, earlier checks will have raised
+                ext_val = 0.0
+            if ext_val <= 0:
+                raise ValueError("vib_obj['extent'] must be positive")
+
+        if 'init_up' in vib_obj:
+            iu = vib_obj['init_up']
+            if isinstance(iu, bool):
+                pass
+            elif isinstance(iu, (int, float)):
+                if iu not in (0, 1):
+                    raise TypeError("vib_obj['init_up'] must be boolean-like (0/1)")
+            elif isinstance(iu, str):
+                if iu.strip().lower() not in {'true', 'false', '0', '1'}:
+                    raise TypeError("vib_obj['init_up'] must be 'true'/'false' or '0'/'1'")
+            else:
+                raise TypeError("vib_obj['init_up'] must be a boolean or boolean-like string")
+
+    def _normalize_vib_obj(self, vib_obj: dict) -> VibObjType:
+        """Return a normalized VibObjType with correct Python types.
+
+        - periods: int (>0)
+        - vert_offset: float
+        - extent: float (>0)
+        - init_up: bool
+        """
+        # Start from defaults
+        norm: VibObjType = {
+            'periods': 8,
+            'vert_offset': 0.0,
+            'init_up': True,
+            'extent': 0.05,
+        }
+
+        # Validate structure leniently first
+        self._validate_vib_obj_structure(vib_obj)
+
+        # Coerce values
+        if 'periods' in vib_obj:
+            p = vib_obj['periods']
+            if isinstance(p, (int, float)):
+                norm['periods'] = int(p)
+            elif isinstance(p, str):
+                norm['periods'] = int(float(p.strip()))
+
+        if 'vert_offset' in vib_obj:
+            v = vib_obj['vert_offset']
+            if isinstance(v, (int, float)):
+                norm['vert_offset'] = float(v)
+            elif isinstance(v, str):
+                norm['vert_offset'] = float(v.strip())
+
+        if 'extent' in vib_obj:
+            e = vib_obj['extent']
+            if isinstance(e, (int, float)):
+                norm['extent'] = float(e)
+            elif isinstance(e, str):
+                norm['extent'] = float(e.strip())
+
+        if 'init_up' in vib_obj:
+            iu = vib_obj['init_up']
+            if isinstance(iu, bool):
+                norm['init_up'] = iu
+            elif isinstance(iu, (int, float)):
+                norm['init_up'] = bool(int(iu))
+            elif isinstance(iu, str):
+                sval = iu.strip().lower()
+                if sval in {'true', '1'}:
+                    norm['init_up'] = True
+                elif sval in {'false', '0'}:
+                    norm['init_up'] = False
+                else:
+                    # Should not happen due to validation above
+                    raise TypeError("vib_obj['init_up'] string must be 'true'/'false' or '0'/'1'")
+
+        # Final sanity checks
+        if norm['periods'] <= 0:
+            raise ValueError("vib_obj['periods'] must be positive after normalization")
+        if norm['extent'] <= 0:
+            raise ValueError("vib_obj['extent'] must be positive after normalization")
+
+        return norm
 
     # ------------------------------- properties -----------------------------
     @property

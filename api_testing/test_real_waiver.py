@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Test the waiver flow with a real Google account that hasn't signed the waiver yet."""
 
-from idtap_api import SwaraClient
+from idtap import SwaraClient
 
 def test_real_waiver_flow():
     """Test the complete waiver flow with a real account."""

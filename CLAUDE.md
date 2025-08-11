@@ -1,7 +1,7 @@
 # IDTAP Python API Development Guide
 
 ## Overview
-The Python API (`idtap_api`) is a sophisticated client library for interacting with the IDTAP (Interactive Digital Transcription and Analysis Platform) server, specifically designed for transcribing, analyzing, and managing Hindustani music recordings.
+The Python API (`idtap`) is a sophisticated client library for interacting with the IDTAP (Interactive Digital Transcription and Analysis Platform) server, specifically designed for transcribing, analyzing, and managing Hindustani music recordings.
 
 ## Key Development Points
 
@@ -12,7 +12,7 @@ The Python API (`idtap_api`) is a sophisticated client library for interacting w
 - Core deps: requests, pyhumps, keyring, cryptography, PyJWT, pymongo, google-auth-oauthlib
 
 ### Testing
-- **Unit tests**: `pytest python/idtap_api/tests/` (uses `responses` for HTTP mocking)
+- **Unit tests**: `pytest python/idtap/tests/` (uses `responses` for HTTP mocking)
 - **Integration tests**: `python python/api_testing/api_test.py` (requires live server auth)
 - Test structure: Complete coverage of data models, client functionality, and authentication
 
@@ -62,7 +62,7 @@ class DataModel:
 
 ### Package Structure
 ```
-python/idtap_api/
+python/idtap/
 ├── __init__.py           # Public API exports
 ├── client.py             # HTTP client (SwaraClient)
 ├── auth.py               # OAuth authentication
@@ -100,7 +100,7 @@ pip install -e python/
 pipenv install --dev
 
 # Testing  
-pytest python/idtap_api/tests/
+pytest python/idtap/tests/
 python python/api_testing/api_test.py
 
 # Package management
@@ -280,7 +280,7 @@ rm -rf dist/ build/ *.egg-info/
 #### Package Structure Issues
 - **Error**: Import errors after installation
 - **Fix**: Check `pyproject.toml` `[tool.setuptools.packages.find]` section
-- **Historical Issue (FIXED)**: Config used to look for `idtap_api*` but package is `idtap*`
+- **Historical Issue (FIXED)**: Config used to look for `idtap*` but package is `idtap*`
 - **Current Status**: ✅ Fixed - now correctly configured to include `idtap*`
 
 #### Dependency Conflicts
@@ -312,7 +312,7 @@ password = pypi-YOUR_TEST_API_TOKEN_HERE
 ### Current Package Status
 - **Package Name**: `idtap` (changed from `idtap-api`)
 - **Current Version**: `0.1.6` (synced in both pyproject.toml and __init__.py) ✅
-- **Package Structure**: Fixed - now correctly includes `idtap*` instead of `idtap_api*` ✅
+- **Package Structure**: Fixed - now correctly includes `idtap*` instead of `idtap*` ✅
 - **Package Data**: Fixed - now correctly references `idtap` directory ✅
 - **Python Support**: >= 3.10
 - **Key Dependencies**: requests, pyhumps, keyring, cryptography, PyJWT

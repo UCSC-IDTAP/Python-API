@@ -9,7 +9,7 @@ This script shows how to:
 4. Verify logout worked
 """
 
-from idtap_api import SwaraClient
+from idtap import SwaraClient
 
 def main():
     """Demonstrate logout functionality."""

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Demo script showing the proper waiver agreement flow."""
 
-from idtap_api import SwaraClient
+from idtap import SwaraClient
 
 def demo_waiver_flow():
     """Demonstrate the research waiver agreement process."""

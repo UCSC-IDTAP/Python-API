@@ -1,5 +1,5 @@
 """
-Utility functions for idtap_api
+Utility functions for idtap
 """
 import humps
 from typing import Dict, Any, List

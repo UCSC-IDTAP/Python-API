@@ -3,7 +3,7 @@
 Examples of how to use the logout functionality in different scenarios.
 """
 
-from idtap_api import SwaraClient
+from idtap import SwaraClient
 
 def example_interactive_logout():
     """Example: Interactive logout with user confirmation."""

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Simple test to experience the waiver flow as a new user would."""
 
-from idtap_api import SwaraClient
+from idtap import SwaraClient
 
 print("🎵 Testing IDTAP Python API")
 print("Connecting to platform...")

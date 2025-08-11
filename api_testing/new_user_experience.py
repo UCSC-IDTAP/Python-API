@@ -6,7 +6,7 @@ This script simulates a typical workflow: authenticate, browse transcriptions,
 and download some data for analysis.
 """
 
-from idtap_api import SwaraClient, Piece
+from idtap import SwaraClient, Piece
 
 def main():
     """Basic IDTAP usage example."""

@@ -13,7 +13,7 @@ from datetime import datetime
 # Add the parent directory to Python path to import idtap
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from idtap_api import (
+from idtap import (
     SwaraClient,
     AudioMetadata, 
     Musician,
