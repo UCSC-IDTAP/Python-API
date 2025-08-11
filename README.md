@@ -1,7 +1,7 @@
 # IDTAP Python API
 
 [![PyPI version](https://badge.fury.io/py/idtap.svg)](https://badge.fury.io/py/idtap)
-[![Documentation Status](https://readthedocs.org/projects/idtap/badge/?version=latest)](https://idtap.readthedocs.io/en/latest/?badge=latest)
+[![Documentation Status](https://readthedocs.org/projects/idtap-api/badge/?version=latest)](https://idtap-python-api.readthedocs.io/en/latest/?badge=latest)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
