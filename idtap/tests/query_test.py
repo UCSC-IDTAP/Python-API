@@ -9,7 +9,7 @@ from idtap.query_types import (
     CategoryType, DesignatorType, SegmentationType,
     QueryAnswerType, QueryType
 )
-from idtap.sequence_utils import find_sequence_indexes, test_loose_sequence_indexes
+from idtap.sequence_utils import find_sequence_indexes, loose_sequence_indexes
 from idtap.classes.piece import Piece
 from idtap.classes.trajectory import Trajectory
 from idtap.classes.pitch import Pitch
@@ -41,22 +41,22 @@ class TestSequenceUtils:
         result = find_sequence_indexes(sequence, longer_sequence)
         assert result == []
     
-    def test_test_loose_sequence_indexes_basic(self):
+    def test_loose_sequence_indexes_basic(self):
         """Test basic loose sequence matching."""
         sequence = [1, 3, 5]
         longer_sequence = [0, 1, 2, 3, 4, 5, 6]
         
-        result = test_loose_sequence_indexes(sequence, longer_sequence)
+        result = loose_sequence_indexes(sequence, longer_sequence)
         assert result["truth"] is True
         assert result["first_idx"] == 1
         assert result["last_idx"] == 5
     
-    def test_test_loose_sequence_indexes_no_match(self):
+    def test_loose_sequence_indexes_no_match(self):
         """Test loose sequence matching with no matches."""
         sequence = [1, 3, 8]
         longer_sequence = [0, 1, 2, 3, 4, 5, 6]
         
-        result = test_loose_sequence_indexes(sequence, longer_sequence)
+        result = loose_sequence_indexes(sequence, longer_sequence)
         assert result["truth"] is False
         assert result["first_idx"] == 1
         assert result["last_idx"] is None
@@ -68,7 +68,7 @@ class TestQueryTypes:
     def test_query_answer_serialization(self):
         """Test QueryAnswerType serialization."""
         # Create mock trajectories and data
-        traj1 = Trajectory({"id": 1, "startTime": 0.0, "endTime": 1.0})
+        traj1 = Trajectory({"id": 1, "startTime": 0.0, "durTot": 1.0})
         
         answer = QueryAnswerType(
             trajectories=[traj1],
@@ -102,12 +102,15 @@ class TestQueryValidation:
         
         # Create minimal phrase and trajectory data
         phrase_data = {
-            "trajectories": [{"id": 1, "startTime": 0.0, "endTime": 1.0, "pitches": []}],
+            "trajectories": [{"id": 1, "startTime": 0.0, "durTot": 1.0, "pitches": []}],
             "startTime": 0.0,
-            "endTime": 1.0,
+            "durTot": 1.0,
             "pieceIdx": 0
         }
         phrase = Phrase.from_json(phrase_data)
+        
+        # Ensure trajectories have correct phrase_idx for queries
+        phrase.assign_phrase_idx()
         
         piece_data = {
             "instrumentation": [Instrument.Sitar],
@@ -218,31 +221,32 @@ class TestQueryExecution:
         # Create trajectories with different IDs and pitches
         traj_data = [
             {
-                "id": 1, "startTime": 0.0, "endTime": 0.5, "phraseIdx": 0, "num": 0,
+                "id": 1, "startTime": 0.0, "durTot": 0.5, "phraseIdx": 0, "num": 0,
                 "pitches": [{"numberedPitch": 60, "time": 0.1}],
                 "vowel": "a", "startConsonant": "k", "endConsonant": "t"
             },
             {
-                "id": 2, "startTime": 0.5, "endTime": 1.0, "phraseIdx": 0, "num": 1,
+                "id": 2, "startTime": 0.5, "durTot": 0.5, "phraseIdx": 0, "num": 1,
                 "pitches": [{"numberedPitch": 62, "time": 0.7}],
                 "vowel": "i", "startConsonant": "r", "endConsonant": None
             },
             {
-                "id": 1, "startTime": 1.0, "endTime": 1.5, "phraseIdx": 0, "num": 2,
+                "id": 1, "startTime": 1.0, "durTot": 0.5, "phraseIdx": 0, "num": 2,
                 "pitches": [{"numberedPitch": 64, "time": 1.2}],
                 "vowel": "u", "startConsonant": "m", "endConsonant": "n"
             }
         ]
         
-        trajectories = [Trajectory.from_json(t) for t in traj_data]
-        
         phrase_data = {
-            "trajectories": trajectories,
+            "trajectories": traj_data,
             "startTime": 0.0,
-            "endTime": 1.5,
+            "durTot": 1.5,
             "pieceIdx": 0
         }
         phrase = Phrase.from_json(phrase_data)
+        
+        # Ensure trajectories have correct phrase_idx for queries
+        phrase.assign_phrase_idx()
         
         piece_data = {
             "instrumentation": [Instrument.Vocal_M],
@@ -374,20 +378,24 @@ class TestMultipleQueries:
         phrases = []
         for i in range(3):
             traj_data = {
-                "id": i + 1, "startTime": 0.0, "endTime": 1.0, 
+                "id": i + 1, "startTime": 0.0, "durTot": 1.0, 
                 "phraseIdx": i, "num": 0,
                 "pitches": [{"numberedPitch": 60 + i, "time": 0.5}],
                 "vowel": ["a", "i", "u"][i]
             }
-            trajectory = Trajectory.from_json(traj_data)
             
             phrase_data = {
-                "trajectories": [trajectory],
+                "trajectories": [traj_data],  # Pass raw JSON data, not Trajectory objects
                 "startTime": float(i), 
-                "endTime": float(i + 1),
+                "durTot": 1.0,
                 "pieceIdx": i
             }
-            phrases.append(Phrase.from_json(phrase_data))
+            phrase = Phrase.from_json(phrase_data)
+            
+            # Ensure trajectories have correct phrase_idx for queries
+            phrase.assign_phrase_idx()
+            
+            phrases.append(phrase)
         
         piece_data = {
             "instrumentation": [Instrument.Vocal_M],
@@ -494,15 +502,13 @@ class TestEdgeCases:
         }
         piece = Piece(piece_data)
         
-        # This should not crash but may not find results
-        query = Query(piece, {
-            "category": CategoryType.TRAJECTORY_ID,
-            "trajectory_id": 1,
-            "instrument_idx": 5  # Invalid index
-        })
-        
-        # Should complete without error
-        assert len(query.trajectories) == 0
+        # This should raise a validation error for invalid instrument index
+        with pytest.raises(ValueError, match="instrument_idx 5 is out of range"):
+            Query(piece, {
+                "category": CategoryType.TRAJECTORY_ID,
+                "trajectory_id": 1,
+                "instrument_idx": 5  # Invalid index
+            })
     
     def test_missing_phrase_data(self):
         """Test query with piece missing required phrase data."""

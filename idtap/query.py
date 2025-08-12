@@ -16,7 +16,7 @@ from .query_types import (
     CategoryType, DesignatorType, SegmentationType, QueryType,
     QueryAnswerType, MultipleReturnType, MultipleOptionType
 )
-from .sequence_utils import find_sequence_indexes, test_loose_sequence_indexes, split_trajs_by_silences
+from .sequence_utils import find_sequence_indexes, loose_sequence_indexes, split_trajs_by_silences
 
 
 class Query:
@@ -85,6 +85,10 @@ class Query:
     
     def _validate_parameters(self) -> None:
         """Validate query parameters based on category and other constraints."""
+        # Instrument index validation
+        if self.instrument_idx < 0 or self.instrument_idx >= len(self.piece.instrumentation):
+            raise ValueError(f"instrument_idx {self.instrument_idx} is out of range. Piece has {len(self.piece.instrumentation)} instruments (valid indices: 0-{len(self.piece.instrumentation)-1})")
+        
         # Sequence length validation
         if self.segmentation == SegmentationType.SEQUENCE_OF_TRAJECTORIES:
             if self.sequence_length is None:
@@ -393,16 +397,16 @@ class Query:
         num_pitch_seq = [pitch.numbered_pitch for pitch in pitch_seq]
         
         if self.designator == DesignatorType.INCLUDES:
-            loose_obj = test_loose_sequence_indexes(num_pitch_seq, n_pitches)
+            loose_obj = loose_sequence_indexes(num_pitch_seq, n_pitches)
             boolean = loose_obj["truth"]
         elif self.designator == DesignatorType.EXCLUDES:
-            loose_obj = test_loose_sequence_indexes(num_pitch_seq, n_pitches)
+            loose_obj = loose_sequence_indexes(num_pitch_seq, n_pitches)
             boolean = not loose_obj["truth"]
         elif self.designator == DesignatorType.STARTS_WITH:
-            loose_obj = test_loose_sequence_indexes(num_pitch_seq, n_pitches)
+            loose_obj = loose_sequence_indexes(num_pitch_seq, n_pitches)
             boolean = loose_obj["truth"] and loose_obj["first_idx"] == 0
         elif self.designator == DesignatorType.ENDS_WITH:
-            loose_obj = test_loose_sequence_indexes(num_pitch_seq, n_pitches)
+            loose_obj = loose_sequence_indexes(num_pitch_seq, n_pitches)
             boolean = loose_obj["truth"] and loose_obj["last_idx"] == len(n_pitches) - 1
         
         return boolean
@@ -430,16 +434,16 @@ class Query:
         boolean = False
         
         if self.designator == DesignatorType.INCLUDES:
-            loose_obj = test_loose_sequence_indexes(traj_id_seq, full_traj_list)
+            loose_obj = loose_sequence_indexes(traj_id_seq, full_traj_list)
             boolean = loose_obj["truth"]
         elif self.designator == DesignatorType.EXCLUDES:
-            loose_obj = test_loose_sequence_indexes(traj_id_seq, full_traj_list)
+            loose_obj = loose_sequence_indexes(traj_id_seq, full_traj_list)
             boolean = not loose_obj["truth"]
         elif self.designator == DesignatorType.STARTS_WITH:
-            loose_obj = test_loose_sequence_indexes(traj_id_seq, full_traj_list)
+            loose_obj = loose_sequence_indexes(traj_id_seq, full_traj_list)
             boolean = loose_obj["truth"] and loose_obj["first_idx"] == 0
         elif self.designator == DesignatorType.ENDS_WITH:
-            loose_obj = test_loose_sequence_indexes(traj_id_seq, full_traj_list)
+            loose_obj = loose_sequence_indexes(traj_id_seq, full_traj_list)
             boolean = loose_obj["truth"] and loose_obj["last_idx"] == len(full_traj_list) - 1
         
         return boolean

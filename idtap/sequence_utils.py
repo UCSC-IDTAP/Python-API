@@ -56,7 +56,7 @@ def find_sequence_indexes(sequence: List[int], longer_sequence: List[int]) -> Li
     return indexes
 
 
-def test_loose_sequence_indexes(
+def loose_sequence_indexes(
     sequence: List[int], 
     longer_sequence: List[int]
 ) -> Dict[str, Optional[int] | bool]:

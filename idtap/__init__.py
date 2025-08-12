@@ -1,6 +1,6 @@
 """Python API package exposing IDTAP data classes and client."""
 
-__version__ = "0.1.7"
+__version__ = "0.1.8"
 
 from .client import SwaraClient
 from .auth import login_google
@@ -51,7 +51,7 @@ from .query_types import (
 )
 from .sequence_utils import (
     find_sequence_indexes,
-    test_loose_sequence_indexes,
+    loose_sequence_indexes,
     split_trajs_by_silences
 )
 
@@ -98,6 +98,6 @@ __all__ = [
     "SecCatType",
     "PhraseCatType",
     "find_sequence_indexes",
-    "test_loose_sequence_indexes",
+    "loose_sequence_indexes",
     "split_trajs_by_silences",
 ]
