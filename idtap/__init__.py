@@ -1,6 +1,6 @@
 """Python API package exposing IDTAP data classes and client."""
 
-__version__ = "0.1.7"
+__version__ = "0.1.8"
 
 from .client import SwaraClient
 from .auth import login_google
@@ -36,6 +36,25 @@ from .audio_models import (
     ProcessingStatus
 )
 
+# Query system exports
+from .query import Query
+from .query_types import (
+    CategoryType,
+    DesignatorType,
+    SegmentationType,
+    QueryType,
+    QueryAnswerType,
+    MultipleReturnType,
+    MultipleOptionType,
+    SecCatType,
+    PhraseCatType
+)
+from .sequence_utils import (
+    find_sequence_indexes,
+    loose_sequence_indexes,
+    split_trajs_by_silences
+)
+
 __all__ = [
     "SwaraClient",
     "Articulation",
@@ -67,4 +86,18 @@ __all__ = [
     "LocationHierarchy",
     "FileInfo",
     "ProcessingStatus",
+    # Query system
+    "Query",
+    "CategoryType",
+    "DesignatorType", 
+    "SegmentationType",
+    "QueryType",
+    "QueryAnswerType",
+    "MultipleReturnType",
+    "MultipleOptionType",
+    "SecCatType",
+    "PhraseCatType",
+    "find_sequence_indexes",
+    "loose_sequence_indexes",
+    "split_trajs_by_silences",
 ]

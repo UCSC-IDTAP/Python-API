@@ -14,6 +14,12 @@ from idtap.classes.piece import Piece
 
 from .auth import login_google, load_token
 from .secure_storage import SecureTokenStorage
+from .query import Query
+from .query_types import (
+    QueryType, MultipleReturnType, CategoryType, 
+    DesignatorType, SegmentationType, QueryAnswerType
+)
+from .classes.pitch import Pitch
 
 
 class SwaraClient:
@@ -714,3 +720,197 @@ class SwaraClient:
             except Exception as e:
                 print("❌ Failed to insert transcription:", e)
                 raise
+    
+    # ---- Query methods ----
+    
+    def single_query(
+        self,
+        transcription_id: str,
+        segmentation: Union[SegmentationType, str] = SegmentationType.PHRASE,
+        designator: Union[DesignatorType, str] = DesignatorType.INCLUDES,
+        category: Union[CategoryType, str] = CategoryType.TRAJECTORY_ID,
+        pitch: Optional[Pitch] = None,
+        sequence_length: Optional[int] = None,
+        trajectory_id: Optional[int] = None,
+        vowel: Optional[str] = None,
+        consonant: Optional[str] = None,
+        instrument_idx: int = 0,
+        **kwargs
+    ) -> Query:
+        """Create and execute a single query on a transcription.
+        
+        Args:
+            transcription_id: ID of the transcription to query
+            segmentation: Type of segmentation (phrase, group, etc.)
+            designator: Query designator (includes, excludes, etc.)
+            category: Query category (trajectoryID, pitch, etc.)
+            pitch: Pitch object to search for (if category is pitch)
+            sequence_length: Length of trajectory sequences (if needed)
+            trajectory_id: Trajectory ID to search for (if category is trajectoryID)
+            vowel: Vowel to search for (if category is vowel)
+            consonant: Consonant to search for (if category is consonant)
+            instrument_idx: Index of instrument track to query
+            **kwargs: Additional query parameters
+            
+        Returns:
+            Query object with results
+        """
+        # Check waiver and prompt if needed
+        self._prompt_for_waiver_if_needed()
+        
+        # Fetch the piece data
+        piece_data = self.get_piece(transcription_id)
+        piece = Piece.from_json(piece_data)
+        
+        # Convert string enums to enum objects if needed
+        if isinstance(segmentation, str):
+            segmentation = SegmentationType(segmentation)
+        if isinstance(designator, str):
+            designator = DesignatorType(designator)
+        if isinstance(category, str):
+            category = CategoryType(category)
+        
+        # Build query options
+        query_options = {
+            "segmentation": segmentation,
+            "designator": designator,
+            "category": category,
+            "pitch": pitch,
+            "sequence_length": sequence_length,
+            "trajectory_id": trajectory_id,
+            "vowel": vowel,
+            "consonant": consonant,
+            "instrument_idx": instrument_idx,
+            **kwargs
+        }
+        
+        return Query(piece, query_options)
+    
+    def multiple_query(
+        self,
+        queries: List[Union[QueryType, Dict[str, Any]]],
+        transcription_id: str,
+        segmentation: Union[SegmentationType, str] = SegmentationType.PHRASE,
+        sequence_length: Optional[int] = None,
+        min_dur: float = 0.0,
+        max_dur: float = 60.0,
+        every: bool = True,
+        instrument_idx: int = 0,
+    ) -> MultipleReturnType:
+        """Execute multiple queries on a transcription and combine results.
+        
+        Args:
+            queries: List of query specifications
+            transcription_id: ID of transcription to query
+            segmentation: Segmentation type for all queries
+            sequence_length: Sequence length for trajectory sequences
+            min_dur: Minimum duration filter
+            max_dur: Maximum duration filter
+            every: If True, require all queries to match; if False, any query can match
+            instrument_idx: Index of instrument track to query
+            
+        Returns:
+            Tuple of (trajectories, identifiers, query_answers)
+        """
+        # Check waiver and prompt if needed
+        self._prompt_for_waiver_if_needed()
+        
+        if not queries:
+            raise ValueError("No queries provided")
+        
+        # Fetch the piece data
+        piece_data = self.get_piece(transcription_id)
+        piece = Piece.from_json(piece_data)
+        
+        # Convert string enum to enum object if needed
+        if isinstance(segmentation, str):
+            segmentation = SegmentationType(segmentation)
+        
+        # Execute multiple query logic (similar to the static method but integrated)
+        output_trajectories: List[List["Trajectory"]] = []
+        output_identifiers: List[str] = []
+        query_answers: List[QueryAnswerType] = []
+        non_stringified_output_identifiers: List[Union[int, str, Dict[str, int]]] = []
+        
+        # Create query objects
+        query_objs = []
+        for query in queries:
+            # Handle both dict and QueryType
+            if isinstance(query, dict):
+                query_dict = query
+            else:
+                query_dict = dict(query)
+            
+            # Convert string enums in query if needed
+            if "designator" in query_dict and isinstance(query_dict["designator"], str):
+                query_dict["designator"] = DesignatorType(query_dict["designator"])
+            if "category" in query_dict and isinstance(query_dict["category"], str):
+                query_dict["category"] = CategoryType(query_dict["category"])
+            
+            query_options = {
+                "segmentation": segmentation,
+                "designator": query_dict.get("designator"),
+                "category": query_dict.get("category"),
+                "pitch": query_dict.get("pitch"),
+                "sequence_length": sequence_length,
+                "trajectory_id": query_dict.get("trajectory_id"),
+                "vowel": query_dict.get("vowel"),
+                "consonant": query_dict.get("consonant"),
+                "pitch_sequence": query_dict.get("pitch_sequence"),
+                "traj_id_sequence": query_dict.get("traj_id_sequence"),
+                "section_top_level": query_dict.get("section_top_level"),
+                "alap_section": query_dict.get("alap_section"),
+                "comp_type": query_dict.get("comp_type"),
+                "comp_sec_tempo": query_dict.get("comp_sec_tempo"),
+                "tala": query_dict.get("tala"),
+                "phrase_type": query_dict.get("phrase_type"),
+                "elaboration_type": query_dict.get("elaboration_type"),
+                "vocal_art_type": query_dict.get("vocal_art_type"),
+                "inst_art_type": query_dict.get("inst_art_type"),
+                "incidental": query_dict.get("incidental"),
+                "min_dur": min_dur,
+                "max_dur": max_dur,
+                "instrument_idx": instrument_idx,
+            }
+            query_objs.append(Query(piece, query_options))
+        
+        if every:
+            # Only select trajectories that are in all answers
+            if query_objs:
+                output_identifiers = query_objs[0].stringified_identifier[:]
+                for answer in query_objs[1:]:
+                    output_identifiers = [
+                        id_str for id_str in output_identifiers 
+                        if id_str in answer.stringified_identifier
+                    ]
+                
+                # Get corresponding trajectories and answers
+                idxs = [
+                    query_objs[0].stringified_identifier.index(id_str) 
+                    for id_str in output_identifiers
+                ]
+                output_trajectories = [query_objs[0].trajectories[idx] for idx in idxs]
+                non_stringified_output_identifiers = [query_objs[0].identifier[idx] for idx in idxs]
+                query_answers = [query_objs[0].query_answers[idx] for idx in idxs]
+        else:
+            # Select trajectories that are in any answer
+            start_times = []
+            seen_ids = set()
+            
+            for answer in query_objs:
+                for s_idx, s_id in enumerate(answer.stringified_identifier):
+                    if s_id not in seen_ids:
+                        seen_ids.add(s_id)
+                        output_identifiers.append(s_id)
+                        output_trajectories.append(answer.trajectories[s_idx])
+                        non_stringified_output_identifiers.append(answer.identifier[s_idx])
+                        query_answers.append(answer.query_answers[s_idx])
+                        start_times.append(answer.start_times[s_idx])
+            
+            # Sort by start times
+            sort_idxs = sorted(range(len(start_times)), key=lambda i: start_times[i])
+            output_trajectories = [output_trajectories[idx] for idx in sort_idxs]
+            non_stringified_output_identifiers = [non_stringified_output_identifiers[idx] for idx in sort_idxs]
+            query_answers = [query_answers[idx] for idx in sort_idxs]
+        
+        return output_trajectories, non_stringified_output_identifiers, query_answers

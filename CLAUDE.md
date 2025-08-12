@@ -144,18 +144,18 @@ git tag vX.X.X && git push origin vX.X.X
 
 **A. Update `idtap/__init__.py`:**
 ```python
-__version__ = "0.1.6"  # Increment from current "0.1.5"
+__version__ = "0.1.8"  # Increment from current "0.1.7"
 ```
 
 **B. Update `pyproject.toml`:**
 ```toml
 [project]
-version = "0.1.6"  # Must match __init__.py exactly
+version = "0.1.8"  # Must match __init__.py exactly
 ```
 
 **Version Increment Rules:**
-- **Patch** (0.1.5 → 0.1.6): Bug fixes, small improvements, validation fixes
-- **Minor** (0.1.6 → 0.2.0): New features, API additions (backwards compatible)
+- **Patch** (0.1.7 → 0.1.8): Bug fixes, small improvements, query system enhancements
+- **Minor** (0.1.8 → 0.2.0): New features, API additions (backwards compatible)
 - **Major** (0.2.0 → 1.0.0): Breaking changes, API modifications
 
 #### 2. Update Dependencies (if needed)
@@ -262,8 +262,8 @@ except ValueError as e:
 
 **A. Create Git Tag:**
 ```bash
-git tag v0.1.6  # Match the version number
-git push origin v0.1.6
+git tag v0.1.8  # Match the version number
+git push origin v0.1.8
 ```
 
 **B. Clean Build Artifacts:**
@@ -311,7 +311,7 @@ password = pypi-YOUR_TEST_API_TOKEN_HERE
 
 ### Current Package Status
 - **Package Name**: `idtap` (changed from `idtap-api`)
-- **Current Version**: `0.1.6` (synced in both pyproject.toml and __init__.py) ✅
+- **Current Version**: `0.1.8` (synced in both pyproject.toml and __init__.py) ✅
 - **Package Structure**: Fixed - now correctly includes `idtap*` instead of `idtap*` ✅
 - **Package Data**: Fixed - now correctly references `idtap` directory ✅
 - **Python Support**: >= 3.10
@@ -323,6 +323,24 @@ password = pypi-YOUR_TEST_API_TOKEN_HERE
 
 For the current comprehensive validation release:
 ```
+## v0.1.8 - Query System Improvements
+
+### 🚀 New Features
+- Enhanced query system functionality
+- Improved authentication token handling investigation
+- Better development workflow for query branch integration
+
+### 🐛 Bug Fixes  
+- Resolved query system integration issues
+- Improved error handling in authentication flow
+
+### 🧪 Testing
+- All existing tests continue to pass
+- Query system thoroughly tested and validated
+
+### ⚠️ Breaking Changes
+None - fully backwards compatible with existing usage
+
 ## v0.1.6 - Enhanced Parameter Validation
 
 ### 🚀 New Features
