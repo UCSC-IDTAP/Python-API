@@ -2,7 +2,7 @@
 Utility functions for idtap
 """
 import humps
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Union
 
 
 def selective_decamelize(obj: Dict[str, Any], preserve_keys: List[str] = None) -> Dict[str, Any]:
@@ -47,3 +47,29 @@ def selective_decamelize(obj: Dict[str, Any], preserve_keys: List[str] = None) -
                 result[snake_key] = value
     
     return result
+
+
+def to_camel_case(obj: Union[Dict[str, Any], List, Any]) -> Union[Dict[str, Any], List, Any]:
+    """
+    Convert dictionary keys from snake_case to camelCase.
+    
+    Args:
+        obj: Object to convert (dict, list, or other)
+        
+    Returns:
+        Object with camelCase keys
+    """
+    return humps.camelize(obj)
+
+
+def to_snake_case(obj: Union[Dict[str, Any], List, Any]) -> Union[Dict[str, Any], List, Any]:
+    """
+    Convert dictionary keys from camelCase to snake_case.
+    
+    Args:
+        obj: Object to convert (dict, list, or other)
+        
+    Returns:
+        Object with snake_case keys
+    """
+    return humps.decamelize(obj)
