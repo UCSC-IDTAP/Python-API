@@ -627,20 +627,35 @@ class Trajectory:
         dur_array = da if da is not None else self.dur_array
         if dur_array is None:
             dur_array = [1/(len(log_freqs)-1)] * (len(log_freqs)-1)
-        bends = [lambda y, i=i: self.id1(y, log_freqs[i:i+2]) for i in range(len(log_freqs)-1)]
-        outs = []
-        for i in range(len(log_freqs)-1):
-            dur_sum = sum(dur_array[:i])
-            outs.append(lambda y, i=i: bends[i]((y - dur_sum)/dur_array[i]))
+        
+        # Get segment start points
         starts = get_starts(dur_array)
+        
+        # Find the correct segment index using proper boundary logic
+        # This matches the TypeScript findLastIndex behavior
         index = -1
-        for i, s in enumerate(starts):
-            if x >= s:
-                index = i
+        for i in range(len(starts)):
+            if x >= starts[i]:
+                # Check if this is the last segment or if x is before the next segment start
+                if i == len(starts) - 1 or x < starts[i + 1]:
+                    index = i
+                    break
+        
         if index == -1:
-            print(outs, index)
-            raise Exception('index error')
-        return outs[index](x)
+            # Fallback for edge cases (x < 0)
+            index = 0
+        
+        # Create the interpolation function for this segment
+        bend = lambda y: self.id1(y, log_freqs[index:index+2])
+        
+        # Calculate the relative position within this segment
+        dur_sum = sum(dur_array[:index])
+        relative_x = (x - dur_sum) / dur_array[index]
+        
+        # Ensure relative_x is within [0, 1] bounds
+        relative_x = max(0.0, min(1.0, relative_x))
+        
+        return bend(relative_x)
 
     def id7(self, x: float, lf: Optional[List[float]] = None, da: Optional[List[float]] = None) -> float:
         log_freqs = lf or self.log_freqs
