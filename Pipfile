@@ -13,8 +13,8 @@ google-auth-oauthlib = "*"
 build = "*"
 twine = "*"
 requests-toolbelt = "*"
-idtap = {file = ".", editable = true}
 pyhumps = "*"
+idtap = "*"
 
 [dev-packages]
 responses = "*"
