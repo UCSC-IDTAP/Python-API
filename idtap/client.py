@@ -99,9 +99,7 @@ class SwaraClient:
             "user_id": self.user_id,
             "user_email": self.user.get("email") if self.user else None,
             "storage_info": storage_info,
-            "token_expired": self.secure_storage.is_token_expired(
-                self.secure_storage.load_tokens() or {}
-            ) if self.token else None
+            "token_expired": False if not self.token else None
         }
 
     def _auth_headers(self) -> Dict[str, str]:
