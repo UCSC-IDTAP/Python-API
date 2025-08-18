@@ -211,17 +211,30 @@ python -m build
 
 #### 5. Test on TestPyPI (Recommended)
 
-**A. Upload to TestPyPI:**
+**A. Authentication Setup:**
+TestPyPI and production PyPI require separate API tokens. Configure in `.envrc` (gitignored):
 ```bash
-python -m twine upload --repository testpypi dist/*
+# TestPyPI token (get from https://test.pypi.org/)
+export TWINE_TESTPYPI_PASSWORD="pypi-[YOUR_TESTPYPI_TOKEN]"
+
+# Production PyPI token (get from https://pypi.org/)
+export TWINE_PASSWORD="pypi-[YOUR_PRODUCTION_TOKEN]"
+
+# Twine username for both
+export TWINE_USERNAME="__token__"
 ```
 
-**B. Test Installation from TestPyPI:**
+**B. Upload to TestPyPI:**
+```bash
+TWINE_PASSWORD="$TWINE_TESTPYPI_PASSWORD" python -m twine upload --repository testpypi dist/*
+```
+
+**C. Test Installation from TestPyPI:**
 ```bash
 pip install --index-url https://test.pypi.org/simple/ idtap
 ```
 
-**C. Verify TestPyPI Installation:**
+**D. Verify TestPyPI Installation:**
 ```bash
 python -c "import idtap; print(idtap.__version__)"
 ```
