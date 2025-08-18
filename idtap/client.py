@@ -99,9 +99,7 @@ class SwaraClient:
             "user_id": self.user_id,
             "user_email": self.user.get("email") if self.user else None,
             "storage_info": storage_info,
-            "token_expired": self.secure_storage.is_token_expired(
-                self.secure_storage.load_tokens() or {}
-            ) if self.token else None
+            "token_expired": False if not self.token else None
         }
 
     def _auth_headers(self) -> Dict[str, str]:
@@ -301,7 +299,12 @@ class SwaraClient:
         
         Args:
             file_path: Path to the audio file to upload
-            metadata: AudioMetadata object with recording information
+            metadata: AudioMetadata object with recording information.
+                     Ragas can be specified in multiple formats:
+                     - AudioRaga objects: AudioRaga(name="Rageshree") (recommended)
+                     - Strings: "Rageshree" (auto-converted to AudioRaga)
+                     - Name dicts: {"name": "Rageshree"} (auto-converted to AudioRaga)
+                     - Legacy format: {"Rageshree": {"performance_sections": {}}} (auto-converted)
             audio_event: Optional AudioEventConfig for associating with audio events
             progress_callback: Optional callback for upload progress (0-100)
             
@@ -310,7 +313,7 @@ class SwaraClient:
             
         Raises:
             FileNotFoundError: If the audio file doesn't exist
-            ValueError: If the file is not a supported audio format
+            ValueError: If the file is not a supported audio format or metadata validation fails
             RuntimeError: If upload fails
         """
         import os
@@ -327,6 +330,13 @@ class SwaraClient:
         if file_path_obj.suffix.lower() not in supported_extensions:
             raise ValueError(f"Unsupported audio format: {file_path_obj.suffix}. "
                            f"Supported formats: {', '.join(supported_extensions)}")
+        
+        # Validate metadata early to provide clear error messages
+        try:
+            # This will trigger raga normalization and validation
+            metadata.to_json()
+        except ValueError as e:
+            raise ValueError(f"Metadata validation failed: {e}")
         
         # Prepare form data
         try:
