@@ -108,14 +108,72 @@ class Permissions:
 
 @dataclass
 class AudioMetadata:
-    """Complete metadata for an audio recording."""
+    """Complete metadata for an audio recording.
+    
+    Args:
+        title: Optional title for the recording
+        musicians: List of Musician objects
+        location: Optional Location object
+        date: Optional RecordingDate object
+        ragas: List of raga specifications. Accepts multiple formats:
+            - AudioRaga objects: AudioRaga(name="Rageshree") (recommended)
+            - Strings: "Rageshree" (auto-converted to AudioRaga)
+            - Name dicts: {"name": "Rageshree"} (auto-converted to AudioRaga)
+            - Legacy format: {"Rageshree": {"performance_sections": {}}} (auto-converted)
+        sa_estimate: Optional fundamental frequency estimate in Hz
+        permissions: Permissions object for access control
+    """
     title: Optional[str] = None
     musicians: List[Musician] = field(default_factory=list)
     location: Optional[Location] = None
     date: Optional[RecordingDate] = None
-    ragas: List[Raga] = field(default_factory=list)
+    ragas: List[Union[Raga, str, Dict[str, Any]]] = field(default_factory=list)
     sa_estimate: Optional[float] = None
     permissions: Permissions = field(default_factory=Permissions)
+
+    def _normalize_ragas(self, ragas: List[Union[Raga, str, Dict[str, Any]]]) -> List[Raga]:
+        """Convert various raga input formats to AudioRaga objects."""
+        normalized = []
+        
+        for i, raga in enumerate(ragas):
+            if isinstance(raga, Raga):
+                # Already an AudioRaga object
+                normalized.append(raga)
+            elif isinstance(raga, str):
+                # String format: "Rageshree" -> AudioRaga(name="Rageshree")
+                normalized.append(Raga(name=raga))
+            elif isinstance(raga, dict):
+                if 'name' in raga:
+                    # Name dict format: {"name": "Rageshree"} -> AudioRaga(name="Rageshree")
+                    normalized.append(Raga(name=raga['name']))
+                elif len(raga) == 1:
+                    # Legacy format: {"Rageshree": {...}} -> AudioRaga(name="Rageshree")
+                    raga_name = list(raga.keys())[0]
+                    normalized.append(Raga(name=raga_name))
+                else:
+                    raise ValueError(f"Raga at index {i}: Invalid dict format. "
+                                   f"Use {{'name': 'RagaName'}} or AudioRaga(name='RagaName') instead.")
+            else:
+                # Check for wrong Raga class (musical analysis Raga)
+                if hasattr(raga, 'name') and hasattr(raga, 'rule_set'):
+                    raise ValueError(f"Raga at index {i}: Musical analysis Raga class not supported for uploads. "
+                                   f"Use AudioRaga(name='{raga.name}') instead.")
+                else:
+                    raise ValueError(f"Raga at index {i}: Invalid raga format. "
+                                   f"Expected AudioRaga object, string, or dict with 'name' key. "
+                                   f"Got {type(raga).__name__}: {raga}")
+        
+        return normalized
+
+    def _validate_ragas(self, ragas: List[Raga]) -> None:
+        """Validate that all ragas are AudioRaga objects with to_json method."""
+        for i, raga in enumerate(ragas):
+            if not hasattr(raga, 'to_json'):
+                raise ValueError(f"Raga at index {i}: Object missing to_json method. "
+                               f"Expected AudioRaga object, got {type(raga).__name__}")
+            if not hasattr(raga, 'name'):
+                raise ValueError(f"Raga at index {i}: Object missing name attribute. "
+                               f"Expected AudioRaga object, got {type(raga).__name__}")
 
     def to_json(self) -> Dict[str, Any]:
         """Convert to JSON format for API."""
@@ -124,9 +182,12 @@ class AudioMetadata:
         for musician in self.musicians:
             musicians_dict[musician.name] = musician.to_json()
 
-        # Convert ragas to dict format expected by API
+        # Normalize and validate ragas, then convert to dict format expected by API
+        normalized_ragas = self._normalize_ragas(self.ragas)
+        self._validate_ragas(normalized_ragas)
+        
         ragas_dict = {}
-        for raga in self.ragas:
+        for raga in normalized_ragas:
             ragas_dict[raga.name] = raga.to_json()
 
         result = {

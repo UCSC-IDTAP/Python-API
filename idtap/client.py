@@ -301,7 +301,12 @@ class SwaraClient:
         
         Args:
             file_path: Path to the audio file to upload
-            metadata: AudioMetadata object with recording information
+            metadata: AudioMetadata object with recording information.
+                     Ragas can be specified in multiple formats:
+                     - AudioRaga objects: AudioRaga(name="Rageshree") (recommended)
+                     - Strings: "Rageshree" (auto-converted to AudioRaga)
+                     - Name dicts: {"name": "Rageshree"} (auto-converted to AudioRaga)
+                     - Legacy format: {"Rageshree": {"performance_sections": {}}} (auto-converted)
             audio_event: Optional AudioEventConfig for associating with audio events
             progress_callback: Optional callback for upload progress (0-100)
             
@@ -310,7 +315,7 @@ class SwaraClient:
             
         Raises:
             FileNotFoundError: If the audio file doesn't exist
-            ValueError: If the file is not a supported audio format
+            ValueError: If the file is not a supported audio format or metadata validation fails
             RuntimeError: If upload fails
         """
         import os
@@ -327,6 +332,13 @@ class SwaraClient:
         if file_path_obj.suffix.lower() not in supported_extensions:
             raise ValueError(f"Unsupported audio format: {file_path_obj.suffix}. "
                            f"Supported formats: {', '.join(supported_extensions)}")
+        
+        # Validate metadata early to provide clear error messages
+        try:
+            # This will trigger raga normalization and validation
+            metadata.to_json()
+        except ValueError as e:
+            raise ValueError(f"Metadata validation failed: {e}")
         
         # Prepare form data
         try:
