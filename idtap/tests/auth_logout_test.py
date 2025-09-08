@@ -9,6 +9,7 @@ from idtap.secure_storage import SecureTokenStorage
 class TestLogoutFunctionality:
     """Test cases for the logout method."""
 
+    @pytest.mark.integration
     @patch('idtap.client.login_google')
     def test_logout_success(self, mock_login):
         """Test successful logout."""
@@ -36,6 +37,7 @@ class TestLogoutFunctionality:
         assert client.user is None
         client.secure_storage.clear_tokens.assert_called_once()
 
+    @pytest.mark.integration
     @patch('idtap.client.login_google')
     def test_logout_cancelled(self, mock_login):
         """Test logout cancellation."""
@@ -62,6 +64,7 @@ class TestLogoutFunctionality:
         assert client.user == {'name': 'Test User', '_id': 'test123'}
         client.secure_storage.clear_tokens.assert_not_called()
 
+    @pytest.mark.integration
     @patch('idtap.client.login_google')
     def test_logout_programmatic(self, mock_login):
         """Test programmatic logout without confirmation."""
@@ -87,6 +90,7 @@ class TestLogoutFunctionality:
         assert client.user is None
         client.secure_storage.clear_tokens.assert_called_once()
 
+    @pytest.mark.integration
     @patch('idtap.client.login_google')
     def test_logout_storage_failure(self, mock_login):
         """Test logout when storage clearing fails."""
@@ -110,6 +114,7 @@ class TestLogoutFunctionality:
         assert result is False
         client.secure_storage.clear_tokens.assert_called_once()
 
+    @pytest.mark.integration
     @patch('idtap.client.login_google')
     def test_logout_exception_handling(self, mock_login):
         """Test logout exception handling."""
