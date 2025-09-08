@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "idtap"
-version = "1.0.0"
+version = "0.1.17"
 description = "Python client library for IDTAP - Interactive Digital Transcription and Analysis Platform for Hindustani music"
 readme = "README.md"
 license = {text = "MIT"}
@@ -109,33 +109,3 @@ markers = [
     "integration: marks tests as integration tests",
 ]
 
-# Python Semantic Release Configuration
-# This handles automatic version bumping and PyPI publishing
-[tool.semantic_release]
-version_variables = [
-    "idtap/__init__.py:__version__",
-]
-version_toml = [
-    "pyproject.toml:project.version",
-]
-version_pattern = [
-    "docs/conf.py:release = '{version}'",
-    "docs/conf.py:version = '{version}'",
-    "README.md:### v{version} (Latest)",
-]
-
-# Project settings
-major_on_zero = false
-branch = "main" 
-upload_to_pypi = false  # Handled by GitHub Actions separately
-upload_to_release = false  # Don't create GitHub releases
-hvcs = "github"
-
-# PATCH-ONLY MODE: All commits increment patch version only
-# Manual control for minor/major bumps via command line
-[tool.semantic_release.commit_parser_options]
-allowed_tags = ["build", "chore", "ci", "docs", "feat", "fix", "perf", "style", "refactor", "test"]
-minor_tags = []  # No automatic minor bumps
-patch_tags = ["build", "chore", "ci", "docs", "feat", "fix", "perf", "style", "refactor", "test"] # Everything is patch
-major_tags = []  # No automatic major bumps
-default_bump_level = 0  # Only bump patch by default (0=patch, 1=minor, 2=major)
