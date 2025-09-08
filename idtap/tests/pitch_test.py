@@ -552,3 +552,191 @@ def test_constructor_rejects_undefined_ratios():
     with pytest.raises(SyntaxError):
         Pitch({'ratios': ratios2})
 
+
+def test_latex_sargam_letter_basic():
+    """Test that latex_sargam_letter returns the same as sargam_letter."""
+    # Test all sargam letters in both raised and lowered forms
+    sargam_tests = [
+        ({'swara': 'sa'}, 'S'),
+        ({'swara': 're', 'raised': False}, 'r'),
+        ({'swara': 're', 'raised': True}, 'R'),
+        ({'swara': 'ga', 'raised': False}, 'g'),
+        ({'swara': 'ga', 'raised': True}, 'G'),
+        ({'swara': 'ma', 'raised': False}, 'm'),
+        ({'swara': 'ma', 'raised': True}, 'M'),
+        ({'swara': 'pa'}, 'P'),
+        ({'swara': 'dha', 'raised': False}, 'd'),
+        ({'swara': 'dha', 'raised': True}, 'D'),
+        ({'swara': 'ni', 'raised': False}, 'n'),
+        ({'swara': 'ni', 'raised': True}, 'N'),
+    ]
+    
+    for options, expected in sargam_tests:
+        p = Pitch(options)
+        assert p.latex_sargam_letter == expected
+        assert p.latex_sargam_letter == p.sargam_letter
+
+
+def test_latex_octaved_sargam_letter_no_octave():
+    """Test LaTeX octaved sargam letter with no octave marking (oct=0)."""
+    p = Pitch({'swara': 'sa', 'oct': 0})
+    assert p.latex_octaved_sargam_letter == 'S'
+    
+    p = Pitch({'swara': 're', 'raised': False, 'oct': 0})
+    assert p.latex_octaved_sargam_letter == 'r'
+
+
+def test_latex_octaved_sargam_letter_positive_octaves():
+    """Test LaTeX octaved sargam letter with positive octaves (dots above)."""
+    # Test oct=1 (single dot above)
+    p = Pitch({'swara': 'sa', 'oct': 1})
+    assert p.latex_octaved_sargam_letter == r'$\dot{\mathrm{S}}$'
+    
+    p = Pitch({'swara': 're', 'raised': False, 'oct': 1})
+    assert p.latex_octaved_sargam_letter == r'$\dot{\mathrm{r}}$'
+    
+    p = Pitch({'swara': 'ga', 'raised': True, 'oct': 1})
+    assert p.latex_octaved_sargam_letter == r'$\dot{\mathrm{G}}$'
+    
+    # Test oct=2 (double dot above)
+    p = Pitch({'swara': 'ma', 'raised': False, 'oct': 2})
+    assert p.latex_octaved_sargam_letter == r'$\ddot{\mathrm{m}}$'
+    
+    p = Pitch({'swara': 'pa', 'oct': 2})
+    assert p.latex_octaved_sargam_letter == r'$\ddot{\mathrm{P}}$'
+    
+    # Test oct=3 (triple dot above)
+    p = Pitch({'swara': 'dha', 'raised': True, 'oct': 3})
+    assert p.latex_octaved_sargam_letter == r'$\dddot{\mathrm{D}}$'
+    
+    p = Pitch({'swara': 'ni', 'raised': False, 'oct': 3})
+    assert p.latex_octaved_sargam_letter == r'$\dddot{\mathrm{n}}$'
+
+
+def test_latex_octaved_sargam_letter_negative_octaves():
+    """Test LaTeX octaved sargam letter with negative octaves (dots below)."""
+    # Test oct=-1 (single dot below)
+    p = Pitch({'swara': 'sa', 'oct': -1})
+    assert p.latex_octaved_sargam_letter == r'$\underset{\bullet}{\mathrm{S}}$'
+    
+    p = Pitch({'swara': 're', 'raised': True, 'oct': -1})
+    assert p.latex_octaved_sargam_letter == r'$\underset{\bullet}{\mathrm{R}}$'
+    
+    # Test oct=-2 (double dot below)
+    p = Pitch({'swara': 'ga', 'raised': False, 'oct': -2})
+    assert p.latex_octaved_sargam_letter == r'$\underset{\bullet\bullet}{\mathrm{g}}$'
+    
+    p = Pitch({'swara': 'ma', 'raised': True, 'oct': -2})
+    assert p.latex_octaved_sargam_letter == r'$\underset{\bullet\bullet}{\mathrm{M}}$'
+    
+    # Test oct=-3 (triple dot below)
+    p = Pitch({'swara': 'pa', 'oct': -3})
+    assert p.latex_octaved_sargam_letter == r'$\underset{\bullet\bullet\bullet}{\mathrm{P}}$'
+    
+    p = Pitch({'swara': 'dha', 'raised': False, 'oct': -3})
+    assert p.latex_octaved_sargam_letter == r'$\underset{\bullet\bullet\bullet}{\mathrm{d}}$'
+
+
+def test_latex_octaved_sargam_letter_all_sargam_all_octaves():
+    """Test all sargam letters across all octave levels."""
+    sargam_letters = ['sa', 're', 'ga', 'ma', 'pa', 'dha', 'ni']
+    octave_expected = {
+        -3: r'\underset{\bullet\bullet\bullet}',
+        -2: r'\underset{\bullet\bullet}',
+        -1: r'\underset{\bullet}',
+        0: '',
+        1: r'\dot',
+        2: r'\ddot',
+        3: r'\dddot'
+    }
+    
+    for swara in sargam_letters:
+        for raised in [True, False]:
+            # Skip invalid combinations (sa and pa are always raised)
+            if swara in ['sa', 'pa'] and not raised:
+                continue
+                
+            p = Pitch({'swara': swara, 'raised': raised})
+            base_letter = p.sargam_letter
+            
+            for oct in range(-3, 4):
+                p_oct = Pitch({'swara': swara, 'raised': raised, 'oct': oct})
+                expected_latex = octave_expected[oct]
+                
+                if oct == 0:
+                    expected_result = base_letter
+                elif expected_latex.startswith(r'\underset'):
+                    expected_result = f'${expected_latex}{{\\mathrm{{{base_letter}}}}}$'
+                else:
+                    expected_result = f'${expected_latex}{{\\mathrm{{{base_letter}}}}}$'
+                
+                assert p_oct.latex_octaved_sargam_letter == expected_result
+
+
+def test_latex_properties_preserve_backward_compatibility():
+    """Test that existing properties are not affected by LaTeX additions."""
+    test_cases = [
+        {'swara': 'sa', 'oct': 0},
+        {'swara': 're', 'raised': False, 'oct': 1},
+        {'swara': 'ga', 'raised': True, 'oct': -1},
+        {'swara': 'ma', 'raised': False, 'oct': 2},
+        {'swara': 'pa', 'oct': -2},
+        {'swara': 'dha', 'raised': True, 'oct': 3},
+        {'swara': 'ni', 'raised': False, 'oct': -3},
+    ]
+    
+    for options in test_cases:
+        p = Pitch(options)
+        
+        # All existing properties should work exactly as before
+        assert hasattr(p, 'sargam_letter')
+        assert hasattr(p, 'octaved_sargam_letter')
+        assert hasattr(p, 'frequency')
+        assert hasattr(p, 'numbered_pitch')
+        assert hasattr(p, 'chroma')
+        
+        # New LaTeX properties should be available
+        assert hasattr(p, 'latex_sargam_letter')
+        assert hasattr(p, 'latex_octaved_sargam_letter')
+        
+        # latex_sargam_letter should match sargam_letter
+        assert p.latex_sargam_letter == p.sargam_letter
+
+
+def test_latex_octave_diacritic_helper():
+    """Test the _octave_latex_diacritic helper method."""
+    # Test all octave levels
+    octave_mapping = {
+        -3: r'\underset{\bullet\bullet\bullet}',
+        -2: r'\underset{\bullet\bullet}',
+        -1: r'\underset{\bullet}',
+        0: '',
+        1: r'\dot',
+        2: r'\ddot',
+        3: r'\dddot'
+    }
+    
+    for oct, expected in octave_mapping.items():
+        p = Pitch({'swara': 'sa', 'oct': oct})
+        assert p._octave_latex_diacritic() == expected
+
+
+def test_latex_properties_edge_cases():
+    """Test LaTeX properties with edge cases and various combinations."""
+    # Test with log_offset (should not affect LaTeX output)
+    p = Pitch({'swara': 'ga', 'raised': False, 'oct': 1, 'log_offset': 0.1})
+    assert p.latex_octaved_sargam_letter == r'$\dot{\mathrm{g}}$'
+    
+    # Test with different fundamentals (should not affect LaTeX output)
+    p = Pitch({'swara': 'ma', 'raised': True, 'oct': -1, 'fundamental': 440.0})
+    assert p.latex_octaved_sargam_letter == r'$\underset{\bullet}{\mathrm{M}}$'
+    
+    # Test serialization includes existing functionality
+    p = Pitch({'swara': 'dha', 'raised': False, 'oct': 2})
+    json_data = p.to_json()
+    p_restored = Pitch.from_json(json_data)
+    
+    # LaTeX properties should work after deserialization
+    assert p_restored.latex_sargam_letter == 'd'
+    assert p_restored.latex_octaved_sargam_letter == r'$\ddot{\mathrm{d}}$'
+
