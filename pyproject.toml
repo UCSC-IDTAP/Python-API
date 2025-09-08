@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "idtap"
-version = "1.0.0"
+version = "0.1.15"
 description = "Python client library for IDTAP - Interactive Digital Transcription and Analysis Platform for Hindustani music"
 readme = "README.md"
 license = {text = "MIT"}
@@ -138,3 +138,4 @@ allowed_tags = ["build", "chore", "ci", "docs", "feat", "fix", "perf", "style", 
 minor_tags = []  # No automatic minor bumps
 patch_tags = ["build", "chore", "ci", "docs", "feat", "fix", "perf", "style", "refactor", "test"] # Everything is patch
 major_tags = []  # No automatic major bumps
+default_bump_level = 0  # Only bump patch by default (0=patch, 1=minor, 2=major)
