@@ -127,8 +127,8 @@ version_pattern = [
 # Project settings
 major_on_zero = false
 branch = "main" 
-upload_to_pypi = false  # Handled by GitHub Actions
-upload_to_release = true
+upload_to_pypi = false  # Handled by GitHub Actions separately
+upload_to_release = false  # Don't create GitHub releases
 hvcs = "github"
 
 # PATCH-ONLY MODE: All commits increment patch version only

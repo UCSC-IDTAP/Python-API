@@ -84,13 +84,11 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           
-      - name: Bump version and create release
+      - name: Bump version
         if: steps.release-check.outputs.should_release == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Creating release for version: ${{ steps.release-check.outputs.new_version }}"
-          semantic-release version
+          echo "Bumping version to: ${{ steps.release-check.outputs.new_version }}"
+          semantic-release version --no-vcs-release
           
       - name: Build package
         if: steps.release-check.outputs.should_release == 'true'
