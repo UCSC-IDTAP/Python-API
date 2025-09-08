@@ -92,5 +92,5 @@ def main():
 
 if __name__ == "__main__":
     new_version = main()
-    # Output just the version for GitHub Actions
+    # Output the version for GitHub Actions  
     print(f"::set-output name=version::{new_version}")
