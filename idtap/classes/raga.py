@@ -72,8 +72,8 @@ class Raga:
             try:
                 raga_rules = client.get_raga_rules(self.name)
                 self.rule_set: RuleSetType = raga_rules.get('rules', yaman_rule_set)
-            except:
-                # Fall back to default if fetch fails
+            except Exception:
+                # Fall back to default if fetch fails (network error, missing raga, etc.)
                 self.rule_set = copy.deepcopy(yaman_rule_set)
         else:
             self.rule_set = copy.deepcopy(opts.get('rule_set', yaman_rule_set))
@@ -88,7 +88,6 @@ class Raga:
             # Either explicit override OR ratios match rule_set - preserve ratios
             self.ratios = list(ratios_opt)
             if preserve_ratios and len(ratios_opt) != self.rule_set_num_pitches:
-                import warnings
                 warnings.warn(
                     f"Raga '{self.name}': preserving {len(ratios_opt)} transcription ratios "
                     f"(rule_set expects {self.rule_set_num_pitches}). Transcription data takes precedence.",
@@ -96,7 +95,6 @@ class Raga:
                 )
         else:
             # Mismatch without override - use rule_set (preserves existing validation behavior)
-            import warnings
             warnings.warn(
                 f"Raga '{self.name}': provided {len(ratios_opt)} ratios but rule_set expects "
                 f"{self.rule_set_num_pitches}. Generating ratios from rule_set.",
@@ -106,8 +104,20 @@ class Raga:
 
         # update tuning values from ratios (only when ratios match rule_set structure)
         if len(self.ratios) == self.rule_set_num_pitches:
+            # Build the mapping once to avoid O(n²) complexity
+            mapping: List[Tuple[str, Optional[str]]] = []
+            for key, val in self.rule_set.items():
+                if isinstance(val, dict):
+                    if val.get('lowered'):
+                        mapping.append((key, 'lowered'))
+                    if val.get('raised'):
+                        mapping.append((key, 'raised'))
+                else:
+                    if val:
+                        mapping.append((key, None))
+            
             for idx, ratio in enumerate(self.ratios):
-                swara, variant = self.ratio_idx_to_tuning_tuple(idx)
+                swara, variant = mapping[idx]
                 if swara in ('sa', 'pa'):
                     self.tuning[swara] = ratio
                 else:
