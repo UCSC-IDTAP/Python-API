@@ -130,6 +130,7 @@ def test_realistic_consonant_vowel_query():
         print(f"   Error: {e}")
 
 
+@pytest.mark.integration
 def test_trajectory_sequence_patterns():
     """Test trajectory sequence patterns with the actual common IDs."""
     
@@ -166,6 +167,7 @@ def test_trajectory_sequence_patterns():
             print(f"Error testing sequence {sequence}: {e}")
 
 
+@pytest.mark.integration
 def test_duration_and_segmentation():
     """Test different segmentation types and duration filtering."""
     
@@ -224,6 +226,7 @@ def test_duration_and_segmentation():
         print(f"Duration filtering error: {e}")
 
 
+@pytest.mark.integration
 def test_serialization_compatibility():
     """Test that results can be serialized for cross-platform use."""
     
