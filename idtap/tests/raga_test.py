@@ -376,6 +376,94 @@ def test_set_ratios_and_stratified_ratios_with_custom_rules():
             assert math.isclose(r.stratified_ratios[idx], ratio, abs_tol=1e-6)
 
 
+def test_from_json():
+    """Test creating a Raga from JSON data."""
+    json_data = {
+        "name": "Bhairav",
+        "fundamental": 440.0,
+        "ruleSet": {
+            "sa": True,
+            "re": {"lowered": True, "raised": False},
+            "ga": {"lowered": False, "raised": True},
+            "ma": {"lowered": False, "raised": True},
+            "pa": True,
+            "dha": {"lowered": True, "raised": False},
+            "ni": {"lowered": False, "raised": True}
+        }
+    }
+    
+    raga = Raga.from_json(json_data)
+    
+    assert raga.name == "Bhairav"
+    assert raga.fundamental == 440.0
+    assert raga.rule_set_num_pitches == 7
+
+
+def test_rageshree_issue_17():
+    """Test for Issue #17: Raga class incorrectly transforms stored ratios.
+    
+    Rageshree has 6 pitches: S R G m D n (komal Ma, komal Ni, no Pa).
+    The stored ratios should be preserved exactly when using from_json().
+    
+    This test uses a static snapshot of the data structure to ensure
+    the Raga class handles it correctly without needing API access.
+    """
+    # Actual stored data structure from transcription ID: 68bedf76ffd9b2d478ee11f3
+    # This represents what comes from the API after get_piece() fetches the ruleSet
+    stored_raga_data = {
+        'name': 'Rageshree',
+        'fundamental': 261.63,
+        'ratios': [
+            1.0,
+            1.122462048309373,
+            1.2599210498948732,
+            1.3348398541700344,  # komal Ma
+            1.681792830507429,   # D
+            1.7817974362806785   # komal Ni
+        ],
+        'ruleSet': {
+            'sa': True,
+            're': {'lowered': False, 'raised': True},
+            'ga': {'lowered': False, 'raised': True},
+            'ma': {'lowered': True, 'raised': False},   # Only komal Ma
+            'pa': False,                                 # No Pa
+            'dha': {'lowered': False, 'raised': True},
+            'ni': {'lowered': True, 'raised': False}     # Only komal Ni
+        }
+    }
+    
+    # Test loading with from_json (preserve_ratios=True)
+    raga = Raga.from_json(stored_raga_data)
+    
+    # Ratios should be preserved exactly as stored
+    assert raga.ratios == stored_raga_data['ratios'], "Ratios should be preserved exactly"
+    assert len(raga.ratios) == 6, f"Expected 6 ratios, got {len(raga.ratios)}"
+    
+    # Verify specific problematic ratios are preserved
+    assert abs(raga.ratios[3] - 1.3348398541700344) < 1e-10, "komal Ma ratio should be preserved"
+    assert abs(raga.ratios[5] - 1.7817974362806785) < 1e-10, "komal Ni ratio should be preserved"
+    
+    # Verify no Pa (1.5) is added
+    pa_ratio = 1.4983070768766815  # Approximate Pa ratio
+    for ratio in raga.ratios:
+        assert abs(ratio - pa_ratio) > 0.01, f"Pa (ratio ~{pa_ratio}) should not be present"
+    
+    # Get pitches and verify correct count in one octave
+    pitches = raga.get_pitches(low=261.63, high=523.25)
+    assert len(pitches) == 6, f"Expected 6 pitches in octave, got {len(pitches)}"
+    
+    # Get frequencies and verify correct count
+    frequencies = raga.get_frequencies(low=261.63, high=523.25)
+    assert len(frequencies) == 6, f"Expected 6 frequencies in octave, got {len(frequencies)}"
+    
+    # Verify pitch letters are correct (no Pa)
+    pitch_letters = [p.sargam_letter for p in pitches]
+    assert 'P' not in pitch_letters, "Pa should not be present in pitch letters"
+    
+    # Verify rule_set has correct number of pitches
+    assert raga.rule_set_num_pitches == 6, f"Expected 6 pitches in rule_set, got {raga.rule_set_num_pitches}"
+
+
 def test_from_json_frequencies_and_helper_mappings():
     r = Raga({'rule_set': additional_rule_set, 'fundamental': fundamental})
     json_obj = r.to_json()

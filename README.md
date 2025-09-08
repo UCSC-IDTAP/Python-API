@@ -312,6 +312,22 @@ python api_testing/api_test.py
 - **Research Contact**: Jonathan Myers & Dard Neuman, UC Santa Cruz
 - **Platform**: [swara.studio](https://swara.studio)
 
+## Release Notes
+
+### v0.1.13 (Latest)
+**🐛 Bug Fixes**
+- **Fixed Issue #17**: Raga class incorrectly transforms stored ratios during loading
+  - Rageshree and other ragas now correctly preserve transcription ratios (6 pitches for Rageshree, no Pa)
+  - Added automatic rule_set fetching from database when missing from API responses
+  - Enhanced `SwaraClient.get_piece()` to populate missing raga rule sets automatically
+  - Improved `stratified_ratios` property to handle ratio/rule_set mismatches gracefully
+- Added comprehensive test coverage for raga ratio preservation
+
+**🔧 Technical Improvements**
+- Enhanced Raga class constructor with `preserve_ratios` parameter for transcription data
+- Updated pitch generation to respect actual transcription content over theoretical rule sets
+- Better error handling and warnings for raga data inconsistencies
+
 ## License
 
 MIT License - see LICENSE file for details.
