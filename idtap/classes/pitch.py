@@ -290,6 +290,18 @@ class Pitch:
             3: '\u20DB'
         }
         return mapping.get(self.oct, '')
+    
+    def _octave_latex_diacritic(self) -> str:
+        """Convert octave to LaTeX math notation for proper diacritic positioning."""
+        mapping = {
+            -3: r'\underset{\bullet\bullet\bullet}',  # Triple dot below  
+            -2: r'\underset{\bullet\bullet}',         # Double dot below
+            -1: r'\underset{\bullet}',                # Single dot below
+            1: r'\dot',                               # Single dot above
+            2: r'\ddot',                              # Double dot above  
+            3: r'\dddot'                              # Triple dot above
+        }
+        return mapping.get(self.oct, '')
 
     @property
     def octaved_scale_degree(self) -> str:
@@ -328,6 +340,24 @@ class Pitch:
         cents = 1200 * math.log2(self.frequency / et_freq)
         sign = '+' if cents >= 0 else '-'
         return f"{sign}{round(abs(cents))}\u00A2"
+
+    @property
+    def latex_sargam_letter(self) -> str:
+        """LaTeX-compatible base sargam letter."""
+        return self.sargam_letter
+
+    @property  
+    def latex_octaved_sargam_letter(self) -> str:
+        """LaTeX math mode sargam letter with properly positioned diacritics."""
+        base_letter = self.sargam_letter
+        latex_diacritic = self._octave_latex_diacritic()
+        
+        if not latex_diacritic:
+            return base_letter  # No octave marking
+        elif latex_diacritic.startswith(r'\underset'):
+            return f'${latex_diacritic}{{\\mathrm{{{base_letter}}}}}$'
+        else:
+            return f'${latex_diacritic}{{\\mathrm{{{base_letter}}}}}$'
 
     @property
     def a440_cents_deviation(self) -> str:
