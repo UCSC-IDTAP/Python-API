@@ -11,6 +11,7 @@ from .classes.assemblage import Assemblage
 from .classes.chikari import Chikari
 from .classes.group import Group
 from .classes.meter import Meter
+from .classes.musical_time import MusicalTime
 from .classes.note_view_phrase import NoteViewPhrase
 from .classes.piece import Piece
 from .classes.phrase import Phrase
@@ -63,6 +64,7 @@ __all__ = [
     "Chikari",
     "Group",
     "Meter",
+    "MusicalTime",
     "NoteViewPhrase",
     "Piece",
     "Phrase",
