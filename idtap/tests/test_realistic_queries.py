@@ -5,6 +5,7 @@ Test realistic queries using the actual data patterns found in the transcription
 
 import sys
 import os
+import pytest
 # Add the parent directory to Python path so we can import idtap
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
@@ -13,6 +14,7 @@ from idtap import SwaraClient, CategoryType, DesignatorType, SegmentationType
 # Test transcription ID 
 TRANSCRIPTION_ID = "645ff354deeaf2d1e33b3c44"
 
+@pytest.mark.integration
 def test_realistic_consonant_vowel_query():
     """Test the query you mentioned: trajectories starting with consonant 'ba' and vowel 'a'."""
     

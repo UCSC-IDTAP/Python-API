@@ -15,6 +15,7 @@ from idtap.classes.piece import Piece
 TEST_TRANSCRIPTION_ID = "645ff354deeaf2d1e33b3c44"
 
 
+@pytest.mark.integration
 class TestRealTranscriptionQueries:
     """Test queries against real transcription data."""
     

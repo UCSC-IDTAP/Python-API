@@ -25,7 +25,7 @@ jobs:
           pip install -e .[dev]
           
       - name: Run tests
-        run: pytest idtap/tests/
+        run: pytest idtap/tests/ -m "not integration"
         
       - name: Build package
         run: python -m build

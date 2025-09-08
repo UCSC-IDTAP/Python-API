@@ -49,7 +49,7 @@ jobs:
         if: steps.release-check.outputs.should_release == 'true'
         run: |
           echo "Running tests before release..."
-          pytest idtap/tests/
+          pytest idtap/tests/ -m "not integration"
           
       - name: Configure git
         if: steps.release-check.outputs.should_release == 'true'
