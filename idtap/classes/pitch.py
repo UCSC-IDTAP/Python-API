@@ -294,12 +294,12 @@ class Pitch:
     def _octave_latex_diacritic(self) -> str:
         """Convert octave to LaTeX math notation for proper diacritic positioning."""
         mapping = {
-            -3: r'\underset{\bullet\bullet\bullet}',  # Triple dot below  
-            -2: r'\underset{\bullet\bullet}',         # Double dot below
-            -1: r'\underset{\bullet}',                # Single dot below
-            1: r'\dot',                               # Single dot above
-            2: r'\ddot',                              # Double dot above  
-            3: r'\dddot'                              # Triple dot above
+            -3: r'\underset{\cdot\cdot\cdot}',  # Triple dot below  
+            -2: r'\underset{\cdot\cdot}',       # Double dot below
+            -1: r'\underset{\cdot}',            # Single dot below
+            1: r'\dot',                         # Single dot above
+            2: r'\ddot',                        # Double dot above  
+            3: r'\dddot'                        # Triple dot above
         }
         return mapping.get(self.oct, '')
 
