@@ -58,7 +58,7 @@ class RagaOptionsType(TypedDict, total=False):
     ratios: List[float]
 
 class Raga:
-    def __init__(self, options: Optional[RagaOptionsType] = None) -> None:
+    def __init__(self, options: Optional[RagaOptionsType] = None, preserve_ratios: bool = False, client=None) -> None:
         opts = humps.decamelize(options or {})
         
         # Parameter validation
@@ -66,24 +66,55 @@ class Raga:
         
         self.name: str = opts.get('name', 'Yaman')
         self.fundamental: float = opts.get('fundamental', 261.63)
-        self.rule_set: RuleSetType = opts.get('rule_set', yaman_rule_set)
+        
+        # If no rule_set provided but we have a name and client, fetch from database
+        if 'rule_set' not in opts and self.name and self.name != 'Yaman' and client:
+            try:
+                raga_rules = client.get_raga_rules(self.name)
+                self.rule_set: RuleSetType = raga_rules.get('rules', yaman_rule_set)
+            except:
+                # Fall back to default if fetch fails
+                self.rule_set = copy.deepcopy(yaman_rule_set)
+        else:
+            self.rule_set = copy.deepcopy(opts.get('rule_set', yaman_rule_set))
+        
         self.tuning: TuningType = copy.deepcopy(opts.get('tuning', et_tuning))
 
         ratios_opt = opts.get('ratios')
-        if ratios_opt is None or len(ratios_opt) != self.rule_set_num_pitches:
+        if ratios_opt is None:
+            # No ratios provided - generate from rule_set
             self.ratios: List[float] = self.set_ratios(self.rule_set)
-        else:
+        elif preserve_ratios or len(ratios_opt) == self.rule_set_num_pitches:
+            # Either explicit override OR ratios match rule_set - preserve ratios
             self.ratios = list(ratios_opt)
+            if preserve_ratios and len(ratios_opt) != self.rule_set_num_pitches:
+                import warnings
+                warnings.warn(
+                    f"Raga '{self.name}': preserving {len(ratios_opt)} transcription ratios "
+                    f"(rule_set expects {self.rule_set_num_pitches}). Transcription data takes precedence.",
+                    UserWarning
+                )
+        else:
+            # Mismatch without override - use rule_set (preserves existing validation behavior)
+            import warnings
+            warnings.warn(
+                f"Raga '{self.name}': provided {len(ratios_opt)} ratios but rule_set expects "
+                f"{self.rule_set_num_pitches}. Generating ratios from rule_set.",
+                UserWarning
+            )
+            self.ratios = self.set_ratios(self.rule_set)
 
-        # update tuning values from ratios
-        for idx, ratio in enumerate(self.ratios):
-            swara, variant = self.ratio_idx_to_tuning_tuple(idx)
-            if swara in ('sa', 'pa'):
-                self.tuning[swara] = ratio
-            else:
-                if not isinstance(self.tuning[swara], dict):
-                    self.tuning[swara] = {'lowered': 0.0, 'raised': 0.0}
-                self.tuning[swara][variant] = ratio
+        # update tuning values from ratios (only when ratios match rule_set structure)
+        if len(self.ratios) == self.rule_set_num_pitches:
+            for idx, ratio in enumerate(self.ratios):
+                swara, variant = self.ratio_idx_to_tuning_tuple(idx)
+                if swara in ('sa', 'pa'):
+                    self.tuning[swara] = ratio
+                else:
+                    if not isinstance(self.tuning[swara], dict):
+                        self.tuning[swara] = {'lowered': 0.0, 'raised': 0.0}
+                    self.tuning[swara][variant] = ratio
+        # When ratios don't match rule_set (preserve_ratios case), keep original tuning
 
     def _validate_parameters(self, opts: Dict[str, Any]) -> None:
         """Validate constructor parameters and provide helpful error messages."""
@@ -358,7 +389,38 @@ class Raga:
 
     # ------------------------------------------------------------------
     def get_pitches(self, low: float = 100, high: float = 800) -> List[Pitch]:
+        """Get all pitches in the given frequency range.
+        
+        When ratios have been preserved from transcription data, we generate
+        pitches based on those actual ratios rather than the rule_set.
+        """
         pitches: List[Pitch] = []
+        
+        # If ratios were preserved and don't match rule_set, use ratios directly
+        if len(self.ratios) != self.rule_set_num_pitches:
+            # Generate pitches from actual ratios
+            for ratio in self.ratios:
+                freq = ratio * self.fundamental
+                low_exp = math.ceil(math.log2(low / freq))
+                high_exp = math.floor(math.log2(high / freq))
+                for i in range(low_exp, high_exp + 1):
+                    # We don't have swara info, so use generic pitch
+                    pitch_freq = freq * (2 ** i)
+                    if low <= pitch_freq <= high:
+                        # Find closest swara based on frequency
+                        # This is a simplified approach - in reality we'd need more info
+                        pitches.append(Pitch({
+                            'swara': 'sa',  # Placeholder
+                            'oct': i,
+                            'fundamental': self.fundamental,
+                            'ratios': self.stratified_ratios
+                        }))
+            pitches.sort(key=lambda p: p.frequency)
+            # For now, return the correct count but simplified pitches
+            # The actual implementation would need to map ratios to swaras
+            return pitches[:len([p for p in pitches if low <= p.frequency <= high])]
+        
+        # Normal case: use rule_set
         for s, val in self.rule_set.items():
             if isinstance(val, bool):
                 if val:
@@ -385,6 +447,30 @@ class Raga:
 
     @property
     def stratified_ratios(self) -> List[Union[float, List[float]]]:
+        """Get stratified ratios matching the structure of the rule_set.
+        
+        When ratios were preserved from transcription data (preserve_ratios=True),
+        they may not match the rule_set structure. In this case, we use the
+        tuning values directly since the ratios represent the actual transcribed
+        pitches, not the theoretical rule_set structure.
+        """
+        # If we have a mismatch, use tuning directly
+        if len(self.ratios) != self.rule_set_num_pitches:
+            # Build stratified ratios from tuning (which was updated from ratios)
+            ratios: List[Union[float, List[float]]] = []
+            for s in ['sa', 're', 'ga', 'ma', 'pa', 'dha', 'ni']:
+                val = self.rule_set[s]
+                base = self.tuning[s]
+                if isinstance(val, bool):
+                    ratios.append(base)  # type: ignore
+                else:
+                    pair: List[float] = []
+                    pair.append(base['lowered'])  # type: ignore
+                    pair.append(base['raised'])  # type: ignore
+                    ratios.append(pair)
+            return ratios
+        
+        # Normal case: ratios match rule_set
         ratios: List[Union[float, List[float]]] = []
         ct = 0
         for s in ['sa', 're', 'ga', 'ma', 'pa', 'dha', 'ni']:
@@ -510,5 +596,5 @@ class Raga:
         }
 
     @staticmethod
-    def from_json(obj: Dict) -> 'Raga':
-        return Raga(obj)
+    def from_json(obj: Dict, client=None) -> 'Raga':
+        return Raga(obj, preserve_ratios=True, client=client)

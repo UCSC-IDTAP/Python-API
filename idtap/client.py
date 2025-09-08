@@ -127,11 +127,36 @@ class SwaraClient:
         return response.content
 
     # ---- API methods ----
-    def get_piece(self, piece_id: str) -> Any:
-        """Return transcription JSON for the given id."""
+    def get_piece(self, piece_id: str, fetch_rule_set: bool = True) -> Any:
+        """Return transcription JSON for the given id.
+        
+        Args:
+            piece_id: The ID of the piece to fetch
+            fetch_rule_set: If True and raga has no ruleSet, fetch it from database
+            
+        Returns:
+            Dictionary containing the piece data with ruleSet populated if needed
+        """
         # Check waiver and prompt if needed
         self._prompt_for_waiver_if_needed()
-        return self._get(f"api/transcription/{piece_id}")
+        piece_data = self._get(f"api/transcription/{piece_id}")
+        
+        # If fetch_rule_set is True and there's a raga without a ruleSet, fetch it
+        if fetch_rule_set and 'raga' in piece_data:
+            raga_data = piece_data['raga']
+            if 'ruleSet' not in raga_data or not raga_data.get('ruleSet'):
+                raga_name = raga_data.get('name')
+                if raga_name and raga_name != 'Yaman':
+                    try:
+                        # Fetch the rule_set from the database
+                        raga_rules = self.get_raga_rules(raga_name)
+                        if 'rules' in raga_rules:
+                            piece_data['raga']['ruleSet'] = raga_rules['rules']
+                    except:
+                        # If fetch fails, leave it as is
+                        pass
+        
+        return piece_data
 
     def excel_data(self, piece_id: str) -> bytes:
         """Export transcription data as Excel file."""

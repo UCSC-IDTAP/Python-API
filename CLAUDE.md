@@ -144,13 +144,13 @@ git tag vX.X.X && git push origin vX.X.X
 
 **A. Update `idtap/__init__.py`:**
 ```python
-__version__ = "0.1.8"  # Increment from current "0.1.7"
+__version__ = "0.1.13"  # Increment from current "0.1.12"
 ```
 
 **B. Update `pyproject.toml`:**
 ```toml
 [project]
-version = "0.1.8"  # Must match __init__.py exactly
+version = "0.1.13"  # Must match __init__.py exactly
 ```
 
 **Version Increment Rules:**
@@ -324,7 +324,7 @@ password = pypi-YOUR_TEST_API_TOKEN_HERE
 
 ### Current Package Status
 - **Package Name**: `idtap` (changed from `idtap-api`)
-- **Current Version**: `0.1.8` (synced in both pyproject.toml and __init__.py) ✅
+- **Current Version**: `0.1.13` (synced in both pyproject.toml and __init__.py) ✅
 - **Package Structure**: Fixed - now correctly includes `idtap*` instead of `idtap*` ✅
 - **Package Data**: Fixed - now correctly references `idtap` directory ✅
 - **Python Support**: >= 3.10
