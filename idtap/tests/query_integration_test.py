@@ -331,6 +331,7 @@ class TestRealTranscriptionQueries:
 class TestQueryPerformance:
     """Test query performance with real data."""
     
+    @pytest.mark.integration
     def test_large_query_performance(self, client=None):
         """Test performance of queries on real transcription."""
         if client is None:
