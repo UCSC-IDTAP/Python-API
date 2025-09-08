@@ -617,33 +617,33 @@ def test_latex_octaved_sargam_letter_negative_octaves():
     """Test LaTeX octaved sargam letter with negative octaves (dots below)."""
     # Test oct=-1 (single dot below)
     p = Pitch({'swara': 'sa', 'oct': -1})
-    assert p.latex_octaved_sargam_letter == r'$\underset{\bullet}{\mathrm{S}}$'
+    assert p.latex_octaved_sargam_letter == r'$\underset{\cdot}{\mathrm{S}}$'
     
     p = Pitch({'swara': 're', 'raised': True, 'oct': -1})
-    assert p.latex_octaved_sargam_letter == r'$\underset{\bullet}{\mathrm{R}}$'
+    assert p.latex_octaved_sargam_letter == r'$\underset{\cdot}{\mathrm{R}}$'
     
     # Test oct=-2 (double dot below)
     p = Pitch({'swara': 'ga', 'raised': False, 'oct': -2})
-    assert p.latex_octaved_sargam_letter == r'$\underset{\bullet\bullet}{\mathrm{g}}$'
+    assert p.latex_octaved_sargam_letter == r'$\underset{\cdot\cdot}{\mathrm{g}}$'
     
     p = Pitch({'swara': 'ma', 'raised': True, 'oct': -2})
-    assert p.latex_octaved_sargam_letter == r'$\underset{\bullet\bullet}{\mathrm{M}}$'
+    assert p.latex_octaved_sargam_letter == r'$\underset{\cdot\cdot}{\mathrm{M}}$'
     
     # Test oct=-3 (triple dot below)
     p = Pitch({'swara': 'pa', 'oct': -3})
-    assert p.latex_octaved_sargam_letter == r'$\underset{\bullet\bullet\bullet}{\mathrm{P}}$'
+    assert p.latex_octaved_sargam_letter == r'$\underset{\cdot\cdot\cdot}{\mathrm{P}}$'
     
     p = Pitch({'swara': 'dha', 'raised': False, 'oct': -3})
-    assert p.latex_octaved_sargam_letter == r'$\underset{\bullet\bullet\bullet}{\mathrm{d}}$'
+    assert p.latex_octaved_sargam_letter == r'$\underset{\cdot\cdot\cdot}{\mathrm{d}}$'
 
 
 def test_latex_octaved_sargam_letter_all_sargam_all_octaves():
     """Test all sargam letters across all octave levels."""
     sargam_letters = ['sa', 're', 'ga', 'ma', 'pa', 'dha', 'ni']
     octave_expected = {
-        -3: r'\underset{\bullet\bullet\bullet}',
-        -2: r'\underset{\bullet\bullet}',
-        -1: r'\underset{\bullet}',
+        -3: r'\underset{\cdot\cdot\cdot}',
+        -2: r'\underset{\cdot\cdot}',
+        -1: r'\underset{\cdot}',
         0: '',
         1: r'\dot',
         2: r'\ddot',
@@ -707,9 +707,9 @@ def test_latex_octave_diacritic_helper():
     """Test the _octave_latex_diacritic helper method."""
     # Test all octave levels
     octave_mapping = {
-        -3: r'\underset{\bullet\bullet\bullet}',
-        -2: r'\underset{\bullet\bullet}',
-        -1: r'\underset{\bullet}',
+        -3: r'\underset{\cdot\cdot\cdot}',
+        -2: r'\underset{\cdot\cdot}',
+        -1: r'\underset{\cdot}',
         0: '',
         1: r'\dot',
         2: r'\ddot',
@@ -729,7 +729,7 @@ def test_latex_properties_edge_cases():
     
     # Test with different fundamentals (should not affect LaTeX output)
     p = Pitch({'swara': 'ma', 'raised': True, 'oct': -1, 'fundamental': 440.0})
-    assert p.latex_octaved_sargam_letter == r'$\underset{\bullet}{\mathrm{M}}$'
+    assert p.latex_octaved_sargam_letter == r'$\underset{\cdot}{\mathrm{M}}$'
     
     # Test serialization includes existing functionality
     p = Pitch({'swara': 'dha', 'raised': False, 'oct': 2})
