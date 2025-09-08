@@ -16,7 +16,10 @@ The Python API (`idtap`) is a sophisticated client library for interacting with 
 - **Integration tests**: `python python/api_testing/api_test.py` (requires live server auth)
 - Test structure: Complete coverage of data models, client functionality, and authentication
 
-### Build/Package/Publish
+### Build/Package/Publish - AUTOMATED via GitHub Actions
+**⚠️ IMPORTANT: Manual publishing is now automated. See "Automated Version Management" section below.**
+
+Manual publishing (for local testing only):
 ```bash
 python -m build
 python -m twine upload dist/*  # or --repository testpypi for testing
@@ -86,12 +89,84 @@ python/idtap/
 - **Multi-instrument**: Sitar, Vocal (Male/Female) with instrument-specific features
 - **Analytical Tools**: Trajectory categorization, phrase grouping, temporal analysis
 
-## Development Workflow
+## Automated Version Management & Publishing
+
+### 🤖 How It Works (python-semantic-release + GitHub Actions)
+
+**PATCH-ONLY MODE**: All commits automatically increment patch version (0.1.14 → 0.1.15) regardless of commit message.
+
+#### Automatic Workflow
+1. **Make changes** → Commit with any message
+2. **Create PR** → GitHub Actions test + upload to TestPyPI automatically
+3. **Merge to main** → Version bumps + PyPI published + GitHub release created
+4. **Zero manual intervention** required!
+
+#### Version Locations (Auto-Updated)
+- `idtap/__init__.py:3` - `__version__ = "0.1.14"`  
+- `pyproject.toml:7` - `version = "0.1.14"`
+- `docs/conf.py:16-17` - `release = '0.1.14'` and `version = '0.1.14'`
+
+### 🎛️ Manual Version Control Commands
+
+**For normal development (patch bumps)**:
+```bash
+# Any commit message works - always bumps patch
+git commit -m "fix something"           # 0.1.14 → 0.1.15
+git commit -m "add new feature"         # 0.1.14 → 0.1.15 
+git commit -m "update docs"             # 0.1.14 → 0.1.15
+```
+
+**When Jon wants to control version bumps manually**:
+```bash
+# Force minor version bump (0.1.15 → 0.2.0)
+semantic-release version --increment minor
+
+# Force major version bump (0.2.0 → 1.0.0)  
+semantic-release version --increment major
+
+# Dry run to see what would happen
+semantic-release version --print --no-commit --no-tag --no-push --no-vcs-release
+```
+
+### 🔧 Configuration Details
+
+**Location**: `pyproject.toml` `[tool.semantic_release]` section
+- **patch_tags**: ALL commit types → patch version increment
+- **minor_tags**: `[]` (empty - no automatic minor bumps)  
+- **major_tags**: `[]` (empty - no automatic major bumps)
+- **Files updated**: `__init__.py`, `pyproject.toml`, `docs/conf.py`
+
+### 🚀 GitHub Actions Workflows
+
+**`.github/workflows/test-pr.yml`**: 
+- Runs on every PR
+- Tests + builds package + uploads to TestPyPI
+- Comments PR with TestPyPI install link
+
+**`.github/workflows/release.yml`**:
+- Runs on merge to main
+- Tests → version bump → build → PyPI publish → GitHub release
+
+### 📋 Required Setup (One-Time)
+
+**GitHub Secrets**:
+- `TESTPYPI_API_TOKEN` - For PR testing uploads
+
+**PyPI Trusted Publisher** (configured):
+- Owner: `UCSC-IDTAP`  
+- Repository: `Python-API`
+- Workflow: `release.yml`
+- Uses OIDC - no API tokens needed for production PyPI
+
+**⚠️ CLAUDE: When Jon asks to update version in special way, use the manual commands above!**
+
+## Development Workflow (Updated for Automation)
 1. **Data Model Development**: Create/modify classes in `/classes/` with proper serialization
-2. **Client Method Development**: Add HTTP methods in `client.py` with authentication
-3. **Testing**: Write unit tests (mocked) + integration tests (live API)  
-4. **Sync Dependencies**: Update both `Pipfile` and `pyproject.toml`
-5. **Build/Test/Publish**: Use standard Python packaging tools
+2. **Client Method Development**: Add HTTP methods in `client.py` with authentication  
+3. **Testing**: Write unit tests (mocked) + integration tests (live API)
+4. **PR Creation**: GitHub Actions automatically test + upload to TestPyPI
+5. **Merge to main**: Automatic version bump + PyPI publish + GitHub release
+6. **No manual version management needed!**
 
 ## Installation Commands
 ```bash
