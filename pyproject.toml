@@ -58,7 +58,8 @@ dev = [
     "black>=23.0.0",
     "isort>=5.12.0",
     "mypy>=1.0.0",
-    "flake8>=6.0.0"
+    "flake8>=6.0.0",
+    "python-semantic-release>=9.0.0"
 ]
 linux = [
     "secretstorage>=3.3.0"
@@ -107,3 +108,33 @@ markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: marks tests as integration tests",
 ]
+
+# Python Semantic Release Configuration
+# This handles automatic version bumping and PyPI publishing
+[tool.semantic_release]
+version_variables = [
+    "idtap/__init__.py:__version__",
+]
+version_toml = [
+    "pyproject.toml:project.version",
+]
+version_pattern = [
+    "docs/conf.py:release = '{version}'",
+    "docs/conf.py:version = '{version}'",
+    "README.md:### v{version} (Latest)",
+]
+
+# Project settings
+major_on_zero = false
+branch = "main" 
+upload_to_pypi = false  # Handled by GitHub Actions
+upload_to_release = true
+hvcs = "github"
+
+# PATCH-ONLY MODE: All commits increment patch version only
+# Manual control for minor/major bumps via command line
+[tool.semantic_release.commit_parser_options]
+allowed_tags = ["build", "chore", "ci", "docs", "feat", "fix", "perf", "style", "refactor", "test"]
+minor_tags = []  # No automatic minor bumps
+patch_tags = ["build", "chore", "ci", "docs", "feat", "fix", "perf", "style", "refactor", "test"] # Everything is patch
+major_tags = []  # No automatic major bumps

@@ -314,7 +314,7 @@ python api_testing/api_test.py
 
 ## Release Notes
 
-### v0.1.13 (Latest)
+### v0.1.14 (Latest)
 **🐛 Bug Fixes**
 - **Fixed Issue #17**: Raga class incorrectly transforms stored ratios during loading
   - Rageshree and other ragas now correctly preserve transcription ratios (6 pitches for Rageshree, no Pa)
