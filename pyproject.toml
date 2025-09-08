@@ -121,6 +121,7 @@ version_toml = [
 version_pattern = [
     "docs/conf.py:release = '{version}'",
     "docs/conf.py:version = '{version}'",
+    "README.md:### v{version} (Latest)",
 ]
 
 # Project settings
