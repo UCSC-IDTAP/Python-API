@@ -502,3 +502,294 @@ class TestEdgeCases:
         if result is not False:
             assert len(result.hierarchical_position) == 1
             # Should not crash and should give reasonable results
+    
+    def test_fractional_beat_distribution_with_reference_level_zero(self):
+        """Test that fractional_beat varies smoothly from 0.0 to 1.0 with reference_level=0 (Issue #28)."""
+        # Create a simple meter for predictable testing
+        meter = Meter(hierarchy=[4, 4], tempo=120, start_time=0, repetitions=1)
+        
+        # Test parameters
+        beat_duration = 60.0 / 120.0  # 0.5 seconds per beat at 120 BPM
+        samples_per_beat = 10
+        
+        print(f"\n=== Testing fractional_beat distribution (Issue #28) ===")
+        print(f"Meter: hierarchy={meter.hierarchy}, tempo={meter.tempo} BPM")
+        print(f"Beat duration: {beat_duration:.3f} seconds")
+        print(f"Cycle duration: {meter.cycle_dur:.3f} seconds")
+        print()
+        
+        # Test each beat in the cycle
+        all_fractional_beats = []
+        for beat_idx in range(4):  # 4 beats in hierarchy [4, 4]
+            print(f"Beat {beat_idx}:")
+            beat_fractional_beats = []
+            
+            # Sample within this beat
+            beat_start_time = beat_idx * beat_duration
+            beat_end_time = (beat_idx + 1) * beat_duration
+            
+            for i in range(samples_per_beat):
+                # Sample from 10% to 90% through the beat to avoid boundary edge cases
+                fraction_through_beat = 0.1 + (0.8 * i / (samples_per_beat - 1))
+                test_time = beat_start_time + fraction_through_beat * beat_duration
+                
+                result = meter.get_musical_time(test_time, reference_level=0)
+                if result is not False:
+                    beat_fractional_beats.append(result.fractional_beat)
+                    all_fractional_beats.append(result.fractional_beat)
+                    print(f"  {test_time:.3f}s -> beat={result.hierarchical_position[0]}, frac={result.fractional_beat:.3f}")
+            
+            # Validate this beat's fractional_beat distribution
+            if beat_fractional_beats:
+                min_frac = min(beat_fractional_beats)
+                max_frac = max(beat_fractional_beats)
+                unique_values = len(set([round(f, 3) for f in beat_fractional_beats]))
+                
+                print(f"  Range: {min_frac:.3f} to {max_frac:.3f}, {unique_values} unique values")
+                
+                # Critical assertions for Issue #28
+                assert min_frac >= 0.0, f"Beat {beat_idx}: fractional_beat minimum {min_frac} should be >= 0.0"
+                assert max_frac <= 1.0, f"Beat {beat_idx}: fractional_beat maximum {max_frac} should be <= 1.0"
+                
+                # This is the key test for Issue #28: fractional_beat should vary significantly within a beat
+                range_span = max_frac - min_frac
+                assert range_span > 0.3, f"Beat {beat_idx}: fractional_beat range {range_span:.3f} is too small. Values clustering near 0.000 (Issue #28 symptom)"
+                
+                # Should have reasonable variation in values
+                assert unique_values >= 3, f"Beat {beat_idx}: Only {unique_values} unique fractional_beat values, expected more variation"
+            
+            print()
+        
+        # Overall analysis across all beats
+        if all_fractional_beats:
+            overall_unique = len(set([round(f, 3) for f in all_fractional_beats]))
+            overall_min = min(all_fractional_beats)
+            overall_max = max(all_fractional_beats)
+            overall_range = overall_max - overall_min
+            
+            print(f"Overall Analysis:")
+            print(f"  Total samples: {len(all_fractional_beats)}")
+            print(f"  Unique fractional_beat values: {overall_unique}")
+            print(f"  Range: {overall_min:.3f} to {overall_max:.3f} (span: {overall_range:.3f})")
+            print(f"  Distribution: {sorted(set([round(f, 3) for f in all_fractional_beats]))}")
+            
+            # Key assertions for Issue #28
+            assert overall_unique >= 10, f"Issue #28: Only {overall_unique} unique fractional_beat values across all samples - should have much more variation"
+            assert overall_range > 0.5, f"Issue #28: Overall fractional_beat range {overall_range:.3f} is too small - values clustering near 0.000"
+            
+            # Check for the specific Issue #28 problem: most values near 0.000
+            near_zero_count = sum(1 for f in all_fractional_beats if f < 0.1)
+            near_zero_percentage = near_zero_count / len(all_fractional_beats) * 100
+            print(f"  Values near 0.000 (< 0.1): {near_zero_count}/{len(all_fractional_beats)} ({near_zero_percentage:.1f}%)")
+            
+            # This should NOT happen with the fix
+            assert near_zero_percentage < 50, f"Issue #28: {near_zero_percentage:.1f}% of fractional_beat values are near 0.000 - indicates clustering problem"
+        
+        print("✓ fractional_beat distribution test passed - Issue #28 resolved")
+    
+    def test_fractional_beat_comparison_across_reference_levels(self):
+        """Compare fractional_beat behavior across different reference levels."""
+        meter = Meter(hierarchy=[3, 3], tempo=90, start_time=0)
+        
+        # Test at a specific time point
+        test_time = 1.0  # 1 second into the meter
+        
+        # Get musical time at different reference levels
+        result_default = meter.get_musical_time(test_time)  # Default (finest level)
+        result_level_0 = meter.get_musical_time(test_time, reference_level=0)  # Beat level
+        result_level_1 = meter.get_musical_time(test_time, reference_level=1)  # Subdivision level
+        
+        print(f"\n=== Reference level comparison at {test_time}s ===")
+        if result_default:
+            print(f"Default: {result_default} (frac={result_default.fractional_beat:.3f})")
+        if result_level_0:
+            print(f"Level 0: {result_level_0} (frac={result_level_0.fractional_beat:.3f})")
+        if result_level_1:  
+            print(f"Level 1: {result_level_1} (frac={result_level_1.fractional_beat:.3f})")
+        
+        # All should return valid results
+        assert result_default is not False
+        assert result_level_0 is not False
+        assert result_level_1 is not False
+        
+        # fractional_beat should be reasonable for all levels
+        assert 0.0 <= result_default.fractional_beat <= 1.0
+        assert 0.0 <= result_level_0.fractional_beat <= 1.0
+        assert 0.0 <= result_level_1.fractional_beat <= 1.0
+        
+        # Each reference level should give different hierarchical position lengths
+        assert len(result_level_0.hierarchical_position) == 1  # Beat only
+        assert len(result_level_1.hierarchical_position) == 2  # Beat + subdivision
+        assert len(result_default.hierarchical_position) == 2  # Full hierarchy [3, 3]
+    
+    def test_issue_28_exact_reproduction(self):
+        """Exact reproduction of Issue #28 with hierarchy [4, 4, 2] and similar parameters."""
+        # Create meter matching the issue description
+        meter = Meter(hierarchy=[4, 4, 2], tempo=58.3, start_time=4.093, repetitions=1)
+        
+        print(f"\n=== Issue #28 Exact Reproduction Test ===")
+        print(f"Hierarchy: {meter.hierarchy}")
+        print(f"Tempo: {meter.tempo:.1f} BPM")
+        print(f"Cycle duration: {meter.cycle_dur:.3f} seconds")
+        print(f"Start time: {meter.start_time:.3f} seconds")
+        print()
+        
+        # Sample times similar to the issue description
+        cycle_start = meter.start_time
+        cycle_end = meter.start_time + meter.cycle_dur
+        sample_times = [
+            cycle_start + 0.0,     # Start
+            cycle_start + 0.216,   # ~5% in  
+            cycle_start + 0.432,   # ~10% in
+            cycle_start + 0.649,   # ~15% in
+            cycle_start + 0.865,   # ~20% in
+            cycle_start + 1.081,   # ~25% in
+            cycle_start + 1.297,   # ~30% in
+            cycle_start + 1.513,   # ~35% in
+            cycle_start + 1.729,   # ~40% in
+            cycle_start + 1.946,   # ~45% in
+            cycle_start + 2.162,   # ~50% in
+            cycle_start + 2.378,   # ~55% in
+            cycle_start + 2.594,   # ~60% in
+            cycle_start + 2.810,   # ~65% in
+            cycle_start + 3.026,   # ~70% in
+            cycle_start + 3.242,   # ~75% in
+            cycle_start + 3.459,   # ~80% in
+            cycle_start + 3.675,   # ~85% in
+            cycle_start + 3.891,   # ~90% in
+            cycle_start + 4.100,   # ~95% in (just before end)
+        ]
+        
+        print("Time      | Musical Time (ref=0)     | fractional_beat | Beat | Analysis")
+        print("--------- | ------------------------ | --------------- | ---- | --------")
+        
+        fractional_beats = []
+        clustering_issues = []
+        
+        for time_point in sample_times:
+            if time_point < cycle_end:  # Within bounds
+                try:
+                    result = meter.get_musical_time(time_point, reference_level=0)
+                    if result is not False:
+                        fractional_beats.append(result.fractional_beat)
+                        beat_num = result.hierarchical_position[0] if result.hierarchical_position else "?"
+                        
+                        # Check for clustering (Issue #28 symptom)
+                        is_clustered = result.fractional_beat < 0.05
+                        analysis = "CLUSTERED!" if is_clustered else "normal"
+                        if is_clustered:
+                            clustering_issues.append(time_point)
+                        
+                        print(f"{time_point:8.3f}s | {str(result):24} | {result.fractional_beat:11.3f} | {beat_num:4} | {analysis}")
+                    else:
+                        print(f"{time_point:8.3f}s | {'Out of bounds':24} | {'N/A':15} | {'N/A':4} | out-of-bounds")
+                except Exception as e:
+                    print(f"{time_point:8.3f}s | {'ERROR: ' + str(e):24} | {'N/A':15} | {'N/A':4} | error")
+        
+        # Analysis of results
+        print(f"\n=== Analysis ===")
+        if fractional_beats:
+            unique_values = len(set([round(f, 3) for f in fractional_beats]))
+            min_frac = min(fractional_beats)
+            max_frac = max(fractional_beats)
+            range_span = max_frac - min_frac
+            
+            clustered_count = sum(1 for f in fractional_beats if f < 0.05)
+            clustered_percentage = clustered_count / len(fractional_beats) * 100
+            
+            print(f"Total samples: {len(fractional_beats)}")
+            print(f"Unique values: {unique_values}")
+            print(f"Range: {min_frac:.3f} to {max_frac:.3f} (span: {range_span:.3f})")
+            print(f"Clustered near 0.000 (< 0.05): {clustered_count}/{len(fractional_beats)} ({clustered_percentage:.1f}%)")
+            print(f"Distribution: {sorted(set([round(f, 3) for f in fractional_beats]))}")
+            
+            # Detect Issue #28 symptoms
+            issue_28_detected = False
+            
+            if clustered_percentage > 60:
+                print(f"⚠️  ISSUE #28 DETECTED: {clustered_percentage:.1f}% of values clustered near 0.000")
+                issue_28_detected = True
+            
+            if unique_values < 8:
+                print(f"⚠️  ISSUE #28 DETECTED: Only {unique_values} unique fractional_beat values (too few)")
+                issue_28_detected = True
+                
+            if range_span < 0.4:
+                print(f"⚠️  ISSUE #28 DETECTED: fractional_beat range {range_span:.3f} too small")  
+                issue_28_detected = True
+            
+            if not issue_28_detected:
+                print("✓ No Issue #28 symptoms detected")
+                
+            # Assertions for proper functionality (these will fail if Issue #28 exists)
+            assert clustered_percentage < 60, f"Issue #28: {clustered_percentage:.1f}% of fractional_beat values clustered near 0.000"
+            assert unique_values >= 8, f"Issue #28: Only {unique_values} unique fractional_beat values, should have more variation"
+            assert range_span >= 0.4, f"Issue #28: fractional_beat range {range_span:.3f} too small, should span more of [0,1]"
+        
+        else:
+            pytest.fail("No fractional_beat values collected - test setup issue")
+        
+        print("✓ Issue #28 reproduction test passed")
+    
+    def test_deep_investigation_of_fractional_beat_calculation(self):
+        """Deep dive into what happens during fractional_beat calculation with reference_level=0."""
+        meter = Meter(hierarchy=[4, 4, 2], tempo=60, start_time=0, repetitions=1)
+        
+        print(f"\n=== Deep Investigation: fractional_beat calculation ===")
+        print(f"Hierarchy: {meter.hierarchy}")
+        print(f"Total pulses: {len(meter.all_pulses)}")
+        print(f"Pulses per cycle: {meter._pulses_per_cycle}")
+        print()
+        
+        # Test at specific subdivision positions that might reveal the issue
+        # If we're at beat 1, subdivision 2, sub-subdivision 1: position [1, 2, 1]
+        # With reference_level=0, this gets truncated to [1] and extended to [1, 0, 0]
+        # This might be the source of incorrect fractional_beat calculation
+        
+        # Let's test at times that would put us in the middle of subdivisions
+        beat_duration = 60.0 / 60.0  # 1 second per beat at 60 BPM
+        subdivision_duration = beat_duration / 4  # 0.25 seconds per subdivision
+        sub_subdivision_duration = subdivision_duration / 2  # 0.125 seconds per sub-subdivision
+        
+        test_cases = [
+            # (description, time, expected_beat, expected_subdivision_approx)  
+            ("Start of beat 0", 0.0, 0, 0),
+            ("Middle of beat 0, subdivision 1", 0.25 + 0.1, 0, 1),  
+            ("Middle of beat 0, subdivision 2", 0.5 + 0.1, 0, 2),
+            ("Middle of beat 0, subdivision 3", 0.75 + 0.1, 0, 3),
+            ("Start of beat 1", 1.0, 1, 0),
+            ("Middle of beat 1, subdivision 2", 1.5 + 0.1, 1, 2),
+            ("Middle of beat 2, subdivision 1", 2.25 + 0.1, 2, 1),
+            ("Middle of beat 3, subdivision 3", 3.75 + 0.1, 3, 3),
+        ]
+        
+        print("Description                              | Time    | Default Result                    | Ref=0 Result                     | Issue?")
+        print("---------------------------------------- | ------- | --------------------------------- | --------------------------------- | ------")
+        
+        for desc, time_point, expected_beat, expected_subdiv in test_cases:
+            # Get both default and reference_level=0 results
+            result_default = meter.get_musical_time(time_point)
+            result_ref0 = meter.get_musical_time(time_point, reference_level=0)
+            
+            if result_default and result_ref0:
+                default_str = f"{result_default} (frac={result_default.fractional_beat:.3f})"
+                ref0_str = f"{result_ref0} (frac={result_ref0.fractional_beat:.3f})"
+                
+                # Check if we're in the middle of a subdivision but fractional_beat is near 0
+                is_in_subdivision_middle = len(result_default.hierarchical_position) >= 2 and result_default.hierarchical_position[1] > 0
+                fractional_beat_near_zero = result_ref0.fractional_beat < 0.1
+                
+                potential_issue = is_in_subdivision_middle and fractional_beat_near_zero
+                issue_flag = "⚠️ ISSUE" if potential_issue else "OK"
+                
+                print(f"{desc:40} | {time_point:7.3f} | {default_str:33} | {ref0_str:33} | {issue_flag}")
+                
+                if potential_issue:
+                    print(f"    → DETECTED: In subdivision {result_default.hierarchical_position[1]} but fractional_beat={result_ref0.fractional_beat:.3f}")
+                    
+            else:
+                print(f"{desc:40} | {time_point:7.3f} | {'None/False':33} | {'None/False':33} | ERROR")
+        
+        print("\nThis test helps identify if the issue is related to position truncation when")
+        print("we're in the middle of subdivisions but reference_level=0 calculation starts")
+        print("from the wrong subdivision boundary.")
