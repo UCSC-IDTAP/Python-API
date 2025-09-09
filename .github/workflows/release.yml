@@ -102,7 +102,7 @@ jobs:
       - name: Commit version bump
         if: steps.release-check.outputs.should_release == 'true'
         run: |
-          git add idtap/__init__.py pyproject.toml
+          git add idtap/__init__.py pyproject.toml docs/conf.py
           git commit -m "chore: bump version to ${{ steps.bump-version.outputs.new_version }}"
           git tag "v${{ steps.bump-version.outputs.new_version }}"
           git push origin main

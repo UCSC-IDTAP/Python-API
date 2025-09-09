@@ -46,8 +46,9 @@ def update_file(filepath, old_version, new_version):
         pattern = f"### v{old_version} (Latest)"
         replacement = f"### v{new_version} (Latest)"
     elif filepath.endswith("conf.py"):
-        content = re.sub(f'release = "{old_version}"', f'release = "{new_version}"', content)
-        content = re.sub(f'version = "{old_version}"', f'version = "{new_version}"', content)
+        # Handle both single and double quotes
+        content = re.sub(f"release = ['\"]({old_version})['\"]", f"release = '{new_version}'", content)
+        content = re.sub(f"version = ['\"]({old_version})['\"]", f"version = '{new_version}'", content)
         path.write_text(content)
         return
     else:
