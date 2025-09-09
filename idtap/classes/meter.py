@@ -599,11 +599,14 @@ class Meter:
             fractional_beat = max(0.0, min(1.0, fractional_beat))
             
         else:
-            # Reference level behavior
+            # Reference level behavior - preserve full positions for fractional_beat calculation
+            # but truncate for final result
             truncated_positions = positions[:ref_level + 1]
             
-            current_level_start_time = self._calculate_level_start_time(truncated_positions, cycle_number, ref_level)
-            level_duration = self._calculate_level_duration(truncated_positions, cycle_number, ref_level)
+            # Use full positions for accurate fractional_beat calculation
+            # This prevents clustering when reference_level=0 (Issue #28)
+            current_level_start_time = self._calculate_level_start_time(positions, cycle_number, ref_level)
+            level_duration = self._calculate_level_duration(positions, cycle_number, ref_level)
             
             if level_duration <= 0:
                 fractional_beat = 0.0
@@ -614,7 +617,7 @@ class Meter:
             # Clamp to [0, 1] range
             fractional_beat = max(0.0, min(1.0, fractional_beat))
             
-            # Update positions to only include levels up to reference
+            # Update positions to only include levels up to reference for final result
             positions = truncated_positions
         
         # Step 5: Result construction
