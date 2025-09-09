@@ -56,11 +56,12 @@ getMusicalTime(realTime: number, referenceLevel?: number): MusicalTime | false
 - `false` - If time is before start_time or after end_time
 
 **Reference Level Behavior:**
-- `referenceLevel=0`: Fractional position within cycle duration (containing unit for beats)
-- `referenceLevel=1`: Fractional position within beat duration (containing unit for subdivisions)
-- `referenceLevel=2`: Fractional position within subdivision duration (containing unit for sub-subdivisions)
-- `referenceLevel=n`: Fractional position within level-(n-1) duration (containing unit for level-n)
-- Default: Fractional position within finest subdivision (between pulses)
+- `fractionalBeat`: ALWAYS represents fractional position between pulses (finest level), regardless of referenceLevel
+- `referenceLevel`: Only affects the truncation of `hierarchicalPosition`:
+  - `referenceLevel=0`: hierarchicalPosition includes only beat level
+  - `referenceLevel=1`: hierarchicalPosition includes beat and subdivision levels  
+  - `referenceLevel=n`: hierarchicalPosition includes levels 0 through n
+  - Default (None): hierarchicalPosition includes all levels
 
 **Boundaries:**
 - **Start**: `realTime >= meter.startTime`
@@ -107,63 +108,51 @@ for each level in hierarchy:
     remainingTime = remainingTime % subdivisionDuration
 ```
 
-### Step 4: Fractional Beat Calculation (Level-Based)
+### Step 4: Fractional Beat Calculation (Always Pulse-Based)
 
-The fractional beat calculation depends on the specified reference level:
-
-#### Default Behavior (Pulse-Based)
-When `referenceLevel` is not specified or equals `hierarchy.length - 1`, calculate fraction between pulses:
+The fractional beat ALWAYS represents the position between pulses (finest level), regardless of reference level:
 
 ```
 currentPulseIndex = hierarchicalPositionToPulseIndex(positions, cycleNumber)
-currentPulseTime = meter.allPulses[currentPulseIndex].realTime
 
-// Handle next pulse (accounting for cycle boundaries)
-if currentPulseIndex + 1 < meter.allPulses.length:
-    nextPulseTime = meter.allPulses[currentPulseIndex + 1].realTime
-else:
-    // Last pulse - use next cycle start
-    nextCycleStart = meter.startTime + (cycleNumber + 1) * meter.cycleDur
-    nextPulseTime = nextCycleStart
-
-pulseDuration = nextPulseTime - currentPulseTime
-if pulseDuration <= 0:
+// Bounds checking
+if currentPulseIndex < 0 or currentPulseIndex >= meter.allPulses.length:
     fractionalBeat = 0.0
 else:
-    timeFromCurrentPulse = realTime - currentPulseTime
-    fractionalBeat = timeFromCurrentPulse / pulseDuration
+    currentPulseTime = meter.allPulses[currentPulseIndex].realTime
+    
+    // Handle next pulse (accounting for cycle boundaries)
+    if currentPulseIndex + 1 < meter.allPulses.length:
+        nextPulseTime = meter.allPulses[currentPulseIndex + 1].realTime
+    else:
+        // Last pulse - use next cycle start
+        nextCycleStart = meter.startTime + (cycleNumber + 1) * meter.cycleDur
+        nextPulseTime = nextCycleStart
+    
+    pulseDuration = nextPulseTime - currentPulseTime
+    if pulseDuration <= 0:
+        fractionalBeat = 0.0
+    else:
+        timeFromCurrentPulse = realTime - currentPulseTime
+        fractionalBeat = timeFromCurrentPulse / pulseDuration
 
 // Clamp to [0, 1] range
 fractionalBeat = max(0.0, min(1.0, fractionalBeat))
 ```
 
-#### Reference Level Behavior
-When `referenceLevel` is specified and < `hierarchy.length - 1`:
+### Step 5: Handle Reference Level Truncation
+
+If a reference level is specified, truncate the hierarchical position (fractional_beat remains unchanged):
 
 ```
-// Truncate hierarchical position to reference level + 1
-truncatedPosition = positions[0..referenceLevel]
-
-// Calculate start time of current reference-level unit
-currentLevelStartTime = calculateLevelStartTime(truncatedPosition, cycleNumber, referenceLevel)
-
-// Calculate duration of reference-level unit (accounting for actual pulse timing)
-levelDuration = calculateLevelDuration(truncatedPosition, cycleNumber, referenceLevel)
-
-if levelDuration <= 0:
-    fractionalBeat = 0.0
-else:
-    timeFromLevelStart = realTime - currentLevelStartTime
-    fractionalBeat = timeFromLevelStart / levelDuration
-
-// Clamp to [0, 1] range
-fractionalBeat = max(0.0, min(1.0, fractionalBeat))
-
-// Update hierarchical position to only include levels up to reference
-positions = truncatedPosition
+if referenceLevel is not None and referenceLevel < len(hierarchy):
+    // Truncate positions to reference level for final result
+    positions = positions[0:referenceLevel+1]
+    
+// Note: fractionalBeat is NOT recalculated - it always remains pulse-based
 ```
 
-### Step 5: Result Construction
+### Step 6: Result Construction
 ```
 return MusicalTime {
     cycleNumber: cycleNumber,
@@ -201,64 +190,7 @@ cycleOffset = cycleNumber * meter.getPulsesPerCycle()
 return pulseIndex + cycleOffset
 ```
 
-### calculateLevelStartTime()
-
-**Purpose:** Calculate the start time of a hierarchical unit at a given reference level.
-
-**Signature:**
-```
-calculateLevelStartTime(positions: number[], cycleNumber: number, referenceLevel: number): number
-```
-
-**Algorithm:**
-```
-// Find the pulse index for the start of this reference-level unit
-startPositions = positions.slice(0, referenceLevel + 1)
-// Zero out all positions below the reference level
-for i = referenceLevel + 1 to hierarchy.length - 1:
-    startPositions[i] = 0
-
-startPulseIndex = hierarchicalPositionToPulseIndex(startPositions, cycleNumber)
-return meter.allPulses[startPulseIndex].realTime
-```
-
-### calculateLevelDuration()
-
-**Purpose:** Calculate the actual duration of a hierarchical unit based on pulse timing.
-
-**Signature:**
-```
-calculateLevelDuration(positions: number[], cycleNumber: number, referenceLevel: number): number
-```
-
-**Algorithm:**
-```
-// Get start time of current unit
-startTime = calculateLevelStartTime(positions, cycleNumber, referenceLevel)
-
-// Calculate start time of next unit at same level
-nextPositions = positions.slice()
-nextPositions[referenceLevel]++
-
-// Handle overflow - if we've exceeded this level, move to next cycle or higher level
-if nextPositions[referenceLevel] >= hierarchy[referenceLevel]:
-    if referenceLevel == 0:
-        // Next beat is in next cycle
-        nextCycleNumber = cycleNumber + 1
-        if nextCycleNumber >= meter.repetitions:
-            // Use meter end time
-            return meter.startTime + meter.repetitions * meter.cycleDur - startTime
-        nextPositions[0] = 0
-        return calculateLevelStartTime(nextPositions, nextCycleNumber, referenceLevel) - startTime
-    else:
-        // Carry over to higher level
-        nextPositions[referenceLevel] = 0
-        nextPositions[referenceLevel - 1]++
-        return calculateLevelDuration(nextPositions, cycleNumber, referenceLevel - 1)
-
-endTime = calculateLevelStartTime(nextPositions, cycleNumber, referenceLevel)
-return endTime - startTime
-```
+**Note:** The simplified implementation no longer requires the complex `calculateLevelStartTime()` and `calculateLevelDuration()` helper functions that were used in the previous reference-level-based fractional beat calculation.
 
 ## Edge Cases & Error Handling
 
@@ -299,10 +231,10 @@ Query: getMusicalTime(2.375, referenceLevel=0)
 
 Expected:
 - cycleNumber: 0
-- hierarchicalPosition: [2] (Beat 3)
-- fractionalBeat: 0.594 (2.375s / 4.0s cycle duration = 59.4% through cycle)
-- toString(): "C0:2+0.594"
-- Readable: "Cycle 1: Beat 3 + 0.594 through cycle"
+- hierarchicalPosition: [2] (Beat 3 only, due to referenceLevel=0)
+- fractionalBeat: 0.0 (exactly on pulse, fractionalBeat always pulse-based)
+- toString(): "C0:2+0.000"
+- Readable: "Cycle 1: Beat 3"
 ```
 
 ### Test Case 3: Reference Level - Subdivision Level (referenceLevel=1)
@@ -313,9 +245,9 @@ Query: getMusicalTime(2.375, referenceLevel=1)
 Expected:
 - cycleNumber: 0
 - hierarchicalPosition: [2, 1] (Beat 3, Subdivision 2)
-- fractionalBeat: 0.375 (0.375s / 1.0s beat duration = 37.5% through beat 2)
-- toString(): "C0:2.1+0.375"
-- Readable: "Cycle 1: Beat 3, Subdivision 2 + 0.375 through beat"
+- fractionalBeat: 0.0 (exactly on pulse, fractionalBeat always pulse-based)
+- toString(): "C0:2.1+0.000"
+- Readable: "Cycle 1: Beat 3, Subdivision 2"
 ```
 
 ### Test Case 4: Complex Hierarchy with Reference Levels
@@ -326,7 +258,7 @@ Query: getMusicalTime(0.15625, referenceLevel=1)
 Expected:
 - cycleNumber: 0
 - hierarchicalPosition: [1, 0] (Beat 2, Subdivision 1)
-- fractionalBeat: 0.25 (0.25 through subdivision duration)
+- fractionalBeat: 0.25 (0.25 through finest-level pulse duration)
 - toString(): "C0:1.0+0.250"
 ```
 
