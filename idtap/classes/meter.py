@@ -496,25 +496,30 @@ class Meter:
         while len(level_start_positions) < reference_level + 1:
             level_start_positions.append(0)
         
-        # Calculate cumulative position as fraction of cycle
-        cumulative_position = 0.0
-        current_subdivisions = 1
+        # Calculate cumulative time offset from cycle start
+        cumulative_time = 0.0
+        current_duration = self.cycle_dur  # Start with full cycle duration
         
         for level in range(reference_level + 1):
             level_size = self.hierarchy[level]
             if isinstance(level_size, list):
                 level_size = sum(level_size)
             
+            # Duration of each unit at this level
+            unit_duration = current_duration / level_size
+            
             if level < len(level_start_positions):
                 position_at_level = level_start_positions[level]
             else:
                 position_at_level = 0
                 
-            # Add this level's contribution to the cumulative position
-            cumulative_position += position_at_level / current_subdivisions
-            current_subdivisions *= level_size
+            # Add time offset for this level
+            cumulative_time += position_at_level * unit_duration
+            
+            # Update duration for next level (duration of current unit)
+            current_duration = unit_duration
         
-        return cycle_start_time + cumulative_position * self.cycle_dur
+        return cycle_start_time + cumulative_time
     
     def _calculate_level_duration(self, positions: List[int], cycle_number: int, reference_level: int) -> float:
         """Calculate actual duration of hierarchical unit based on pulse timing."""
@@ -617,24 +622,66 @@ class Meter:
         
         # Step 4: Fractional beat calculation
         if ref_level == len(self.hierarchy) - 1:
-            # Default behavior: pulse-based calculation
-            current_pulse_index = self._hierarchical_position_to_pulse_index(positions, cycle_number)
-            current_pulse_time = self.all_pulses[current_pulse_index].real_time
-            
-            # Handle next pulse
-            if current_pulse_index + 1 < len(self.all_pulses):
-                next_pulse_time = self.all_pulses[current_pulse_index + 1].real_time
+            # Default behavior: pulse-based calculation, but check for sparse pulse data
+            expected_pulses = self._pulses_per_cycle * self.repetitions
+            if len(self.all_pulses) < expected_pulses * 0.5:  # Less than 50% of expected pulses
+                # Fall back to proportional timing calculation for sparse pulse data
+                # For fractional_beat, we need the containing unit (parent) duration and start time
+                if ref_level == 0:
+                    # Ref level 0: fractional position within the cycle
+                    current_level_start_time = self.start_time + cycle_number * self.cycle_dur
+                    level_duration = self.cycle_dur
+                else:
+                    # Ref level > 0: fractional position within the parent unit
+                    parent_positions = positions[:ref_level]  # Parent positions
+                    current_level_start_time = self._calculate_proportional_level_start_time(parent_positions, cycle_number, ref_level - 1)
+                    level_duration = self._calculate_proportional_level_duration(parent_positions, cycle_number, ref_level - 1)
+                
+                if level_duration <= 0:
+                    fractional_beat = 0.0
+                else:
+                    time_from_level_start = real_time - current_level_start_time
+                    fractional_beat = time_from_level_start / level_duration
             else:
-                # Last pulse - use next cycle start
-                next_cycle_start = self.start_time + (cycle_number + 1) * self.cycle_dur
-                next_pulse_time = next_cycle_start
-            
-            pulse_duration = next_pulse_time - current_pulse_time
-            if pulse_duration <= 0:
-                fractional_beat = 0.0
-            else:
-                time_from_current_pulse = real_time - current_pulse_time
-                fractional_beat = time_from_current_pulse / pulse_duration
+                # Use pulse-based calculation for complete pulse data
+                current_pulse_index = self._hierarchical_position_to_pulse_index(positions, cycle_number)
+                
+                # Add bounds checking for pulse access
+                if current_pulse_index < 0 or current_pulse_index >= len(self.all_pulses):
+                    # Fall back to proportional calculation if pulse index out of bounds
+                    # For fractional_beat, we need the containing unit (parent) duration and start time
+                    if ref_level == 0:
+                        # Ref level 0: fractional position within the cycle
+                        current_level_start_time = self.start_time + cycle_number * self.cycle_dur
+                        level_duration = self.cycle_dur
+                    else:
+                        # Ref level > 0: fractional position within the parent unit
+                        parent_positions = positions[:ref_level]  # Parent positions
+                        current_level_start_time = self._calculate_proportional_level_start_time(parent_positions, cycle_number, ref_level - 1)
+                        level_duration = self._calculate_proportional_level_duration(parent_positions, cycle_number, ref_level - 1)
+                    
+                    if level_duration <= 0:
+                        fractional_beat = 0.0
+                    else:
+                        time_from_level_start = real_time - current_level_start_time
+                        fractional_beat = time_from_level_start / level_duration
+                else:
+                    # Safe pulse-based calculation - use parent unit logic for reference levels
+                    if ref_level == 0:
+                        # Ref level 0: fractional position within the cycle
+                        current_level_start_time = self.start_time + cycle_number * self.cycle_dur
+                        level_duration = self.cycle_dur
+                    else:
+                        # For ref_level > 0: fractional position within the parent unit
+                        parent_positions = positions[:ref_level]  # Truncate to parent level
+                        current_level_start_time = self._calculate_proportional_level_start_time(parent_positions, cycle_number, ref_level - 1)
+                        level_duration = self._calculate_proportional_level_duration(parent_positions, cycle_number, ref_level - 1)
+                    
+                    if level_duration <= 0:
+                        fractional_beat = 0.0
+                    else:
+                        time_from_level_start = real_time - current_level_start_time
+                        fractional_beat = time_from_level_start / level_duration
             
             # Clamp to [0, 1] range
             fractional_beat = max(0.0, min(1.0, fractional_beat))
@@ -643,8 +690,16 @@ class Meter:
             # Reference level behavior
             truncated_positions = positions[:ref_level + 1]
             
-            current_level_start_time = self._calculate_level_start_time(truncated_positions, cycle_number, ref_level)
-            level_duration = self._calculate_level_duration(truncated_positions, cycle_number, ref_level)
+            # For fractional_beat calculation, we need the containing unit (parent) duration and start time
+            if ref_level == 0:
+                # Ref level 0: fractional position within the cycle
+                current_level_start_time = self.start_time + cycle_number * self.cycle_dur
+                level_duration = self.cycle_dur
+            else:
+                # Ref level > 0: fractional position within the parent unit
+                parent_positions = truncated_positions[:-1]  # Remove the last position for parent unit
+                current_level_start_time = self._calculate_proportional_level_start_time(parent_positions, cycle_number, ref_level - 1)
+                level_duration = self._calculate_proportional_level_duration(parent_positions, cycle_number, ref_level - 1)
             
             if level_duration <= 0:
                 fractional_beat = 0.0

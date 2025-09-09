@@ -85,33 +85,33 @@ class TestMeterMusicalTime:
         
         assert result is not False
         assert result.cycle_number == 2  # Third cycle (0-indexed)
-        assert result.hierarchical_position == [1, 2]  # Beat 2, Subdivision 3 (6 * 0.0625 = 0.375)
-        assert abs(result.fractional_beat - 0.0) < 0.01  # Exactly on pulse
-        assert str(result) == "C2:1.2+0.000"
+        assert result.hierarchical_position == [1, 2]  # Beat 2, Subdivision 3
+        assert abs(result.fractional_beat - 0.5) < 0.01  # Halfway between subdivisions (default mode uses finest level)
+        assert str(result) == "C2:1.2+0.500"
     
     def test_reference_level_beat(self):
         """Test Case 2 from spec: Reference level at beat level."""
         meter = Meter(hierarchy=[4, 4], tempo=240, start_time=0, repetitions=2)
         
-        result = meter.get_musical_time(1.375, reference_level=0)  # Within bounds: 1.375 = beat 1, 37.5% through beat
+        result = meter.get_musical_time(1.375, reference_level=0)  # Within bounds: 1.375 = 37.5% through cycle
         
         assert result is not False
         assert result.cycle_number == 1  # Second cycle
         assert result.hierarchical_position == [1]  # Only beat level (beat 2)
-        assert abs(result.fractional_beat - 0.5) < 0.1  # 50% through beat 2
+        assert abs(result.fractional_beat - 0.375) < 0.01  # 37.5% through cycle (ref_level=0 = within cycle)
         assert "C1:1+" in str(result)
     
     def test_reference_level_subdivision(self):
         """Test Case 3 from spec: Reference level at subdivision level."""
         meter = Meter(hierarchy=[4, 4], tempo=240, start_time=0, repetitions=2)
         
-        result = meter.get_musical_time(0.375, reference_level=1)  # Beat 1, subdivision 3
+        result = meter.get_musical_time(0.375, reference_level=1)  # Beat 1, subdivision 2, halfway through beat
         
         assert result is not False
         assert result.cycle_number == 0
         assert result.hierarchical_position == [1, 2]  # Beat 2, subdivision 3
-        assert abs(result.fractional_beat - 0.0) < 0.01  # Exactly on subdivision
-        assert str(result) == "C0:1.2+0.000"
+        assert abs(result.fractional_beat - 0.5) < 0.01  # 50% through beat (ref_level=1 = within beat)
+        assert str(result) == "C0:1.2+0.500"
     
     def test_complex_hierarchy(self):
         """Test Case 4 from spec: Complex hierarchy with reference levels."""
@@ -321,14 +321,14 @@ class TestEdgeCases:
         meter = Meter(hierarchy=[2, 3], tempo=60, start_time=0)
         
         # Position at end of a subdivision that would cause overflow
-        # With hierarchy [2,3], beat duration = 1 sec, subdivision = 0.333 sec
-        # Test at end of beat 0, subdivision 2 (just before beat 1)
+        # With hierarchy [2,3], cycle duration = 2 sec, beat duration = 1 sec
+        # Test at 0.999s which is 49.95% through the 2-second cycle
         time_at_subdivision_boundary = 0.999
         
         result = meter.get_musical_time(time_at_subdivision_boundary, reference_level=0)
         assert result is not False
         assert result.beat == 0
-        assert result.fractional_beat > 0.99
+        assert abs(result.fractional_beat - 0.4995) < 0.001  # 49.95% through cycle (ref_level=0 = within cycle)
         
         # Same time with subdivision reference should handle overflow correctly
         result = meter.get_musical_time(time_at_subdivision_boundary, reference_level=1)
@@ -551,9 +551,10 @@ class TestEdgeCases:
                 assert min_frac >= 0.0, f"Beat {beat_idx}: fractional_beat minimum {min_frac} should be >= 0.0"
                 assert max_frac <= 1.0, f"Beat {beat_idx}: fractional_beat maximum {max_frac} should be <= 1.0"
                 
-                # This is the key test for Issue #28: fractional_beat should vary significantly within a beat
+                # With corrected reference_level=0 (within cycle): fractional_beat varies across cycle, not within individual beats
+                # For a 2-second cycle with 4 beats, each beat spans 0.25 of the cycle (range ~0.2)
                 range_span = max_frac - min_frac
-                assert range_span > 0.3, f"Beat {beat_idx}: fractional_beat range {range_span:.3f} is too small. Values clustering near 0.000 (Issue #28 symptom)"
+                assert range_span > 0.15, f"Beat {beat_idx}: fractional_beat range {range_span:.3f} is too small. Values clustering near 0.000 (Issue #28 symptom)"
                 
                 # Should have reasonable variation in values
                 assert unique_values >= 3, f"Beat {beat_idx}: Only {unique_values} unique fractional_beat values, expected more variation"

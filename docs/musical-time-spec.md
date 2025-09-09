@@ -56,9 +56,10 @@ getMusicalTime(realTime: number, referenceLevel?: number): MusicalTime | false
 - `false` - If time is before start_time or after end_time
 
 **Reference Level Behavior:**
-- `referenceLevel=0`: Fractional position within beat duration
-- `referenceLevel=1`: Fractional position within subdivision duration  
-- `referenceLevel=n`: Fractional position within level-n duration
+- `referenceLevel=0`: Fractional position within cycle duration (containing unit for beats)
+- `referenceLevel=1`: Fractional position within beat duration (containing unit for subdivisions)
+- `referenceLevel=2`: Fractional position within subdivision duration (containing unit for sub-subdivisions)
+- `referenceLevel=n`: Fractional position within level-(n-1) duration (containing unit for level-n)
 - Default: Fractional position within finest subdivision (between pulses)
 
 **Boundaries:**
@@ -291,7 +292,7 @@ Expected:
 - toString(): "C0:2.1+0.500"
 ```
 
-### Test Case 2: Reference Level - Beat Level
+### Test Case 2: Reference Level - Beat Level (referenceLevel=0)
 ```
 Meter: hierarchy=[4, 4], tempo=240, startTime=0, repetitions=2  
 Query: getMusicalTime(2.375, referenceLevel=0)
@@ -299,12 +300,12 @@ Query: getMusicalTime(2.375, referenceLevel=0)
 Expected:
 - cycleNumber: 0
 - hierarchicalPosition: [2] (Beat 3)
-- fractionalBeat: 0.375 (0.375 through beat duration of 1.0 second)
-- toString(): "C0:2+0.375"
-- Readable: "Cycle 1: Beat 3 + 0.375 through beat"
+- fractionalBeat: 0.594 (2.375s / 4.0s cycle duration = 59.4% through cycle)
+- toString(): "C0:2+0.594"
+- Readable: "Cycle 1: Beat 3 + 0.594 through cycle"
 ```
 
-### Test Case 3: Reference Level - Subdivision Level  
+### Test Case 3: Reference Level - Subdivision Level (referenceLevel=1)
 ```
 Meter: hierarchy=[4, 4], tempo=240, startTime=0, repetitions=2
 Query: getMusicalTime(2.375, referenceLevel=1)
@@ -312,9 +313,9 @@ Query: getMusicalTime(2.375, referenceLevel=1)
 Expected:
 - cycleNumber: 0
 - hierarchicalPosition: [2, 1] (Beat 3, Subdivision 2)
-- fractionalBeat: 0.5 (0.5 through subdivision duration of 0.25 seconds)
-- toString(): "C0:2.1+0.500"
-- Readable: "Cycle 1: Beat 3, Subdivision 2 + 0.500 through subdivision"
+- fractionalBeat: 0.375 (0.375s / 1.0s beat duration = 37.5% through beat 2)
+- toString(): "C0:2.1+0.375"
+- Readable: "Cycle 1: Beat 3, Subdivision 2 + 0.375 through beat"
 ```
 
 ### Test Case 4: Complex Hierarchy with Reference Levels
