@@ -1,6 +1,10 @@
 from __future__ import annotations
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Union, Literal, TYPE_CHECKING
 from uuid import uuid4
+import math
+
+if TYPE_CHECKING:
+    from .musical_time import MusicalTime
 
 # Tempo validation constants
 MIN_TEMPO_BPM = 20  # Very slow musical pieces (e.g., some alap sections)
@@ -420,3 +424,189 @@ class Meter:
 
     def __eq__(self, other: object) -> bool:
         return isinstance(other, Meter) and self.to_json() == other.to_json()
+
+    # Musical time conversion methods
+    
+    def _validate_reference_level(self, reference_level: Optional[int]) -> int:
+        """Validate and normalize reference level parameter."""
+        if reference_level is None:
+            return len(self.hierarchy) - 1
+        
+        if not isinstance(reference_level, int):
+            raise TypeError(f"reference_level must be an integer, got {type(reference_level).__name__}")
+        
+        if reference_level < 0:
+            raise ValueError(f"reference_level must be non-negative, got {reference_level}")
+        
+        if reference_level >= len(self.hierarchy):
+            raise ValueError(f"reference_level {reference_level} exceeds hierarchy depth {len(self.hierarchy)}")
+        
+        return reference_level
+    
+    def _hierarchical_position_to_pulse_index(self, positions: List[int], cycle_number: int) -> int:
+        """Convert hierarchical position to pulse index."""
+        pulse_index = 0
+        multiplier = 1
+        
+        # Work from finest to coarsest level
+        for level in range(len(positions) - 1, -1, -1):
+            position = positions[level]
+            hierarchy_size = self.hierarchy[level]
+            
+            if isinstance(hierarchy_size, list):
+                hierarchy_size = sum(hierarchy_size)
+            
+            pulse_index += position * multiplier
+            multiplier *= hierarchy_size
+        
+        # Add offset for cycle
+        cycle_offset = cycle_number * self._pulses_per_cycle
+        return pulse_index + cycle_offset
+    
+    def _calculate_level_start_time(self, positions: List[int], cycle_number: int, reference_level: int) -> float:
+        """Calculate start time of hierarchical unit at reference level."""
+        # Create positions for start of reference-level unit
+        # Ensure we have positions up to reference_level
+        start_positions = list(positions[:reference_level + 1])
+        # Extend with zeros for levels below reference level
+        while len(start_positions) < len(self.hierarchy):
+            start_positions.append(0)
+        
+        start_pulse_index = self._hierarchical_position_to_pulse_index(start_positions, cycle_number)
+        return self.all_pulses[start_pulse_index].real_time
+    
+    def _calculate_level_duration(self, positions: List[int], cycle_number: int, reference_level: int) -> float:
+        """Calculate actual duration of hierarchical unit based on pulse timing."""
+        # Get start time of current unit
+        start_time = self._calculate_level_start_time(positions, cycle_number, reference_level)
+        
+        # Calculate start time of next unit at same level
+        next_positions = positions.copy()
+        next_positions[reference_level] += 1
+        
+        # Handle overflow - if we've exceeded this level
+        hierarchy_size = self.hierarchy[reference_level]
+        if isinstance(hierarchy_size, list):
+            hierarchy_size = sum(hierarchy_size)
+            
+        if next_positions[reference_level] >= hierarchy_size:
+            if reference_level == 0:
+                # Next beat is in next cycle
+                next_cycle_number = cycle_number + 1
+                if next_cycle_number >= self.repetitions:
+                    # Use meter end time
+                    return self.start_time + self.repetitions * self.cycle_dur - start_time
+                next_positions[0] = 0
+                return self._calculate_level_start_time(next_positions, next_cycle_number, reference_level) - start_time
+            else:
+                # Carry over to higher level
+                next_positions[reference_level] = 0
+                next_positions[reference_level - 1] += 1
+                return self._calculate_level_duration(next_positions, cycle_number, reference_level - 1)
+        
+        end_time = self._calculate_level_start_time(next_positions, cycle_number, reference_level)
+        return end_time - start_time
+    
+    def get_musical_time(self, real_time: float, reference_level: Optional[int] = None) -> Union['MusicalTime', Literal[False]]:
+        """
+        Convert real time to musical time within this meter.
+        
+        Args:
+            real_time: Time in seconds
+            reference_level: Hierarchical level for fractional calculation 
+                           (0=beat, 1=subdivision, etc.). Defaults to finest level.
+            
+        Returns:
+            MusicalTime object if time falls within meter boundaries, False otherwise
+        """
+        from .musical_time import MusicalTime
+        
+        # Step 1: Boundary validation
+        if real_time < self.start_time:
+            return False
+        
+        end_time = self.start_time + self.repetitions * self.cycle_dur
+        if real_time >= end_time:
+            return False
+        
+        # Validate reference level
+        ref_level = self._validate_reference_level(reference_level)
+        
+        # Step 2: Cycle calculation
+        relative_time = real_time - self.start_time
+        cycle_number = int(relative_time // self.cycle_dur)
+        cycle_offset = relative_time % self.cycle_dur
+        
+        # Step 3: Hierarchical position calculation
+        positions = []
+        remaining_time = cycle_offset
+        
+        total_finest_subdivisions = self._pulses_per_cycle
+        current_group_size = total_finest_subdivisions
+        
+        for level, size in enumerate(self.hierarchy):
+            if isinstance(size, list):
+                size = sum(size)
+            
+            current_group_size = current_group_size // size
+            subdivision_duration = current_group_size * self._pulse_dur
+            
+            if subdivision_duration <= 0:
+                position_at_level = 0
+            else:
+                position_at_level = int(remaining_time // subdivision_duration)
+            
+            positions.append(position_at_level)
+            
+            if subdivision_duration > 0:
+                remaining_time = remaining_time % subdivision_duration
+        
+        # Step 4: Fractional beat calculation
+        if ref_level == len(self.hierarchy) - 1:
+            # Default behavior: pulse-based calculation
+            current_pulse_index = self._hierarchical_position_to_pulse_index(positions, cycle_number)
+            current_pulse_time = self.all_pulses[current_pulse_index].real_time
+            
+            # Handle next pulse
+            if current_pulse_index + 1 < len(self.all_pulses):
+                next_pulse_time = self.all_pulses[current_pulse_index + 1].real_time
+            else:
+                # Last pulse - use next cycle start
+                next_cycle_start = self.start_time + (cycle_number + 1) * self.cycle_dur
+                next_pulse_time = next_cycle_start
+            
+            pulse_duration = next_pulse_time - current_pulse_time
+            if pulse_duration <= 0:
+                fractional_beat = 0.0
+            else:
+                time_from_current_pulse = real_time - current_pulse_time
+                fractional_beat = time_from_current_pulse / pulse_duration
+            
+            # Clamp to [0, 1] range
+            fractional_beat = max(0.0, min(1.0, fractional_beat))
+            
+        else:
+            # Reference level behavior
+            truncated_positions = positions[:ref_level + 1]
+            
+            current_level_start_time = self._calculate_level_start_time(truncated_positions, cycle_number, ref_level)
+            level_duration = self._calculate_level_duration(truncated_positions, cycle_number, ref_level)
+            
+            if level_duration <= 0:
+                fractional_beat = 0.0
+            else:
+                time_from_level_start = real_time - current_level_start_time
+                fractional_beat = time_from_level_start / level_duration
+            
+            # Clamp to [0, 1] range
+            fractional_beat = max(0.0, min(1.0, fractional_beat))
+            
+            # Update positions to only include levels up to reference
+            positions = truncated_positions
+        
+        # Step 5: Result construction
+        return MusicalTime(
+            cycle_number=cycle_number,
+            hierarchical_position=positions,
+            fractional_beat=fractional_beat
+        )
