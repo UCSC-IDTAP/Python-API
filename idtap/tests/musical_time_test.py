@@ -356,3 +356,149 @@ class TestEdgeCases:
         result = meter.get_musical_time(1.5, reference_level=0)
         assert result is not False
         assert len(result.hierarchical_position) == 1
+    
+    def test_reference_level_zero_indexerror_reproduction(self):
+        """Test to reproduce IndexError with reference_level=0 (Issue #26)."""
+        # Try different meter configurations that might trigger the error
+        test_configs = [
+            ([4, 4, 2], 120),
+            ([2, 3, 4], 60), 
+            ([3, 2], 240),
+            ([8], 120),
+            ([2, 2, 2, 2], 180)
+        ]
+        
+        for hierarchy, tempo in test_configs:
+            meter = Meter(hierarchy=hierarchy, tempo=tempo, start_time=0)
+            
+            # Test various time points within the meter
+            cycle_duration = meter.cycle_dur
+            test_times = [
+                0.1,  # Near start
+                cycle_duration * 0.25,  # Quarter way through
+                cycle_duration * 0.5,   # Half way 
+                cycle_duration * 0.75,  # Three quarters
+                cycle_duration * 0.99,  # Near end
+            ]
+            
+            for time_point in test_times:
+                try:
+                    result = meter.get_musical_time(time_point, reference_level=0)
+                    if result is not False:  # Only check if within meter bounds
+                        assert len(result.hierarchical_position) == 1, f"Should have 1 position for reference_level=0 with hierarchy {hierarchy}"
+                        assert result.hierarchical_position[0] >= 0, "Position should be non-negative"
+                except IndexError as e:
+                    pytest.fail(f"IndexError raised with hierarchy {hierarchy}, tempo {tempo}, time {time_point}, reference_level=0: {e}")
+                except Exception as e:
+                    # Let other exceptions bubble up with context
+                    pytest.fail(f"Unexpected error with hierarchy {hierarchy}, tempo {tempo}, time {time_point}: {e}")
+        
+        # Test edge case: reference_level=0 with positions that might cause overflow
+        meter = Meter(hierarchy=[2, 2], tempo=60, start_time=0)
+        try:
+            # Test at exact beat boundaries which might cause index issues
+            result = meter.get_musical_time(1.0, reference_level=0)  # Exactly at beat 1
+            if result is not False:
+                assert len(result.hierarchical_position) == 1
+        except IndexError as e:
+            pytest.fail(f"IndexError at beat boundary with reference_level=0: {e}")
+        
+        # Test with multi-cycle meter - this might trigger the error
+        meter = Meter(hierarchy=[4, 4, 2], tempo=120, start_time=0, repetitions=2)
+        try:
+            # Test near the end of cycle or at various points
+            test_times = [meter.cycle_dur - 0.01, meter.cycle_dur + 0.01, meter.cycle_dur * 1.5]
+            for t in test_times:
+                result = meter.get_musical_time(t, reference_level=0)
+                if result is not False:
+                    assert len(result.hierarchical_position) == 1
+        except IndexError as e:
+            pytest.fail(f"IndexError with multi-cycle meter and reference_level=0: {e}")
+        
+        # Test very specific timing that might trigger calculation edge case
+        meter = Meter(hierarchy=[4, 4, 2], tempo=120, start_time=0)
+        try:
+            # Test at the end of each beat - this is where overflow might happen
+            beat_duration = 60.0 / 120  # 0.5 seconds per beat at 120 BPM
+            for beat in range(4):  # Test each beat in the cycle
+                time_at_end_of_beat = beat_duration * (beat + 1) - 0.001  # Just before next beat
+                result = meter.get_musical_time(time_at_end_of_beat, reference_level=0)
+                if result is not False:
+                    assert len(result.hierarchical_position) == 1
+        except IndexError as e:
+            pytest.fail(f"IndexError at beat boundaries with reference_level=0: {e}")
+        
+        # Test the specific case where next_positions causes pulse index overflow
+        # This happens when we're at the last beat of a cycle with reference_level=0
+        meter = Meter(hierarchy=[4, 2], tempo=120, start_time=0, repetitions=1)  
+        try:
+            # Get close to the end of the last beat (beat 3, index 3 in hierarchy [4, 2])
+            # With tempo 120, beat duration is 0.5 seconds
+            # Total cycle duration should be 4 beats * 0.5 = 2.0 seconds
+            # Let's test at beat 3.9 (just before beat 4, which would overflow)
+            time_near_end = 3.9 * 0.5  # Should be 1.95 seconds
+            result = meter.get_musical_time(time_near_end, reference_level=0)
+            if result is not False:
+                assert len(result.hierarchical_position) == 1
+                # This should trigger the duration calculation that tries to find the "next beat"
+                # which would be beat 4 (index 4), causing overflow since hierarchy[0] = 4 (indices 0,1,2,3)
+        except IndexError as e:
+            pytest.fail(f"IndexError when calculating duration near end of cycle with reference_level=0: {e}")
+        
+        # Even more specific test - try to force the exact overflow scenario
+        meter = Meter(hierarchy=[2], tempo=60, start_time=0, repetitions=1)
+        try:
+            # With hierarchy [2], we have beats 0 and 1
+            # Test at beat 1 (the last beat) - this should cause next_position[0] = 2, which overflows
+            beat_1_time = 1.0 * (60.0 / 60.0) * 0.9  # 90% through beat 1
+            result = meter.get_musical_time(beat_1_time, reference_level=0)
+            if result is not False:
+                assert len(result.hierarchical_position) == 1
+        except IndexError as e:
+            pytest.fail(f"IndexError with simple [2] hierarchy at last beat with reference_level=0: {e}")
+    
+    def test_reference_level_zero_bounds_checking(self):
+        """Test that bounds checking prevents IndexError when pulse index exceeds bounds."""
+        # Test with a simple meter where we can predictably hit boundary conditions
+        meter = Meter(hierarchy=[2, 2], tempo=60, start_time=0, repetitions=1)
+        
+        # Test at various points including near boundaries
+        # The key is testing reference_level=0 which might try to calculate duration
+        # by looking for the "next beat" which could exceed pulse array bounds
+        test_times = []
+        beat_duration = 60.0 / 60.0  # 1 second per beat at 60 BPM
+        
+        # Add times throughout the meter, especially near beat boundaries
+        for beat in range(2):  # 2 beats in hierarchy [2, 2]
+            for fraction in [0.1, 0.5, 0.9, 0.99]:
+                test_time = beat * beat_duration + fraction * beat_duration
+                test_times.append(test_time)
+        
+        # Test all time points with reference_level=0
+        for time_point in test_times:
+            result = meter.get_musical_time(time_point, reference_level=0)
+            if result is not False:
+                assert len(result.hierarchical_position) == 1, f"Should have 1 position at time {time_point}"
+                assert isinstance(result.fractional_beat, float), f"Should have valid fractional_beat at time {time_point}"
+                assert 0.0 <= result.fractional_beat <= 1.0, f"fractional_beat should be in [0,1] at time {time_point}"
+        
+        # Test specifically at the boundary that might cause the original IndexError
+        # When we're in the last beat and try to calculate duration
+        last_beat_time = 1.8  # Near end of beat 1 (last beat) in a 2-beat cycle
+        result = meter.get_musical_time(last_beat_time, reference_level=0)
+        if result is not False:
+            assert len(result.hierarchical_position) == 1
+            assert result.hierarchical_position[0] == 1  # Should be in beat 1 (second beat)
+            
+    def test_defensive_bounds_in_calculate_level_start_time(self):
+        """Test that _calculate_level_start_time handles out-of-bounds indices gracefully."""
+        meter = Meter(hierarchy=[3], tempo=120, start_time=0, repetitions=1)
+        
+        # This should work without IndexError even if internal calculations go out of bounds
+        # Test near the end of the cycle where "next beat" calculations might overflow
+        near_end_time = meter.cycle_dur * 0.95
+        result = meter.get_musical_time(near_end_time, reference_level=0)
+        
+        if result is not False:
+            assert len(result.hierarchical_position) == 1
+            # Should not crash and should give reasonable results

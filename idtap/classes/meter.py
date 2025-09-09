@@ -473,6 +473,19 @@ class Meter:
             start_positions.append(0)
         
         start_pulse_index = self._hierarchical_position_to_pulse_index(start_positions, cycle_number)
+        
+        # Add bounds checking to prevent IndexError
+        if start_pulse_index < 0 or start_pulse_index >= len(self.all_pulses):
+            # This can happen when calculating duration of the last unit in a level
+            # In such cases, we should use the meter's end time
+            if start_pulse_index >= len(self.all_pulses):
+                # Beyond the last pulse - use meter end time
+                total_duration = self.repetitions * self.cycle_dur
+                return self.start_time + total_duration
+            else:
+                # Negative index (shouldn't happen but defensive)
+                return self.start_time
+        
         return self.all_pulses[start_pulse_index].real_time
     
     def _calculate_level_duration(self, positions: List[int], cycle_number: int, reference_level: int) -> float:
