@@ -466,9 +466,10 @@ class Meter:
     def _calculate_level_start_time(self, positions: List[int], cycle_number: int, reference_level: int) -> float:
         """Calculate start time of hierarchical unit at reference level."""
         # Create positions for start of reference-level unit
-        start_positions = positions[:reference_level + 1]
-        # Zero out all positions below the reference level
-        for i in range(reference_level + 1, len(self.hierarchy)):
+        # Ensure we have positions up to reference_level
+        start_positions = list(positions[:reference_level + 1])
+        # Extend with zeros for levels below reference level
+        while len(start_positions) < len(self.hierarchy):
             start_positions.append(0)
         
         start_pulse_index = self._hierarchical_position_to_pulse_index(start_positions, cycle_number)
