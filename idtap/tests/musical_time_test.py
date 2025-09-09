@@ -267,3 +267,92 @@ class TestEdgeCases:
         assert "Beat 2" in readable2
         assert "Sub-sub-subdivision 2" in readable2
         assert "0.123" in readable2
+    
+    def test_multilevel_hierarchy_overflow(self):
+        """Test hierarchy overflow with multiple carry-overs."""
+        # Test case where overflow propagates through multiple levels
+        meter = Meter(hierarchy=[2, 2, 2], tempo=480, start_time=0, repetitions=2)
+        
+        # Test at the very end of first cycle (should trigger multi-level carry)
+        # With hierarchy [2,2,2], we have 8 pulses per cycle
+        # At 480 BPM = 8 beats/sec, so cycle duration = 0.25 sec
+        end_of_first_cycle = 0.25 - 0.001
+        result = meter.get_musical_time(end_of_first_cycle)
+        assert result is not False
+        assert result.cycle_number == 0
+        
+        # Test at start of second cycle
+        result = meter.get_musical_time(0.25)
+        assert result is not False
+        assert result.cycle_number == 1
+        assert result.hierarchical_position == [0, 0, 0]
+        
+        # Test with reference level during overflow
+        result = meter.get_musical_time(0.249, reference_level=1)
+        assert result is not False
+        assert len(result.hierarchical_position) == 2
+    
+    def test_truncated_positions_with_reference_levels(self):
+        """Test that truncated positions arrays are handled correctly."""
+        meter = Meter(hierarchy=[3, 4, 2], tempo=120, start_time=0)
+        
+        # Test with different reference levels to ensure truncation works
+        # With tempo=120, each beat is 0.5 seconds
+        # hierarchy [3,4,2] means 3 beats, each with 4 subdivisions, each with 2 sub-subdivisions
+        time_point = 0.75  # Within the meter (1.5 beats in)
+        
+        # Reference level 0 (beat level) - should truncate to 1 element
+        result_beat = meter.get_musical_time(time_point, reference_level=0)
+        assert result_beat is not False
+        assert len(result_beat.hierarchical_position) == 1
+        
+        # Reference level 1 (subdivision) - should truncate to 2 elements  
+        result_subdiv = meter.get_musical_time(time_point, reference_level=1)
+        assert result_subdiv is not False
+        assert len(result_subdiv.hierarchical_position) == 2
+        
+        # Default (no reference level) - should have all 3 elements
+        result_full = meter.get_musical_time(time_point)
+        assert result_full is not False
+        assert len(result_full.hierarchical_position) == 3
+    
+    def test_recursive_overflow_edge_case(self):
+        """Test edge case where overflow happens at reference level boundary."""
+        meter = Meter(hierarchy=[2, 3], tempo=60, start_time=0)
+        
+        # Position at end of a subdivision that would cause overflow
+        # With hierarchy [2,3], beat duration = 1 sec, subdivision = 0.333 sec
+        # Test at end of beat 0, subdivision 2 (just before beat 1)
+        time_at_subdivision_boundary = 0.999
+        
+        result = meter.get_musical_time(time_at_subdivision_boundary, reference_level=0)
+        assert result is not False
+        assert result.beat == 0
+        assert result.fractional_beat > 0.99
+        
+        # Same time with subdivision reference should handle overflow correctly
+        result = meter.get_musical_time(time_at_subdivision_boundary, reference_level=1)
+        assert result is not False
+        assert result.hierarchical_position[0] == 0  # Still in beat 0
+        assert result.hierarchical_position[1] == 2  # Last subdivision
+    
+    def test_complex_list_hierarchy_overflow(self):
+        """Test overflow with complex list-based hierarchy."""
+        # Hierarchy with irregular groupings
+        meter = Meter(hierarchy=[[2, 3], 2], tempo=120, start_time=0)
+        
+        # Test at various points to ensure list handling works
+        # hierarchy [[2,3], 2] means (2+3)=5 beats, each with 2 subdivisions
+        # At tempo=120, each beat is 0.5 seconds
+        result = meter.get_musical_time(1.0)  # At 2 beats (1.0 / 0.5 = 2)
+        assert result is not False
+        assert result.beat == 2  # Third beat (index 2)
+        
+        result = meter.get_musical_time(2.0)  # At 4 beats
+        assert result is not False
+        assert result.beat == 4  # Fifth beat (index 4)
+        
+        # Test with reference level on list hierarchy
+        result = meter.get_musical_time(1.5, reference_level=0)
+        assert result is not False
+        assert len(result.hierarchical_position) == 1
