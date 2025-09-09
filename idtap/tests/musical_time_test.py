@@ -81,7 +81,7 @@ class TestMeterMusicalTime:
         """Test Case 1 from spec: Regular meter with default level."""
         meter = Meter(hierarchy=[4, 4], tempo=240, start_time=0, repetitions=3)  # Extended to 3 repetitions
         
-        result = meter.get_musical_time(2.375)  # This is now in the 3rd cycle
+        result = meter.get_musical_time(2.40625)  # Halfway between subdivision 2 and 3 in 3rd cycle
         
         assert result is not False
         assert result.cycle_number == 2  # Third cycle (0-indexed)
@@ -93,25 +93,45 @@ class TestMeterMusicalTime:
         """Test Case 2 from spec: Reference level at beat level."""
         meter = Meter(hierarchy=[4, 4], tempo=240, start_time=0, repetitions=2)
         
-        result = meter.get_musical_time(1.375, reference_level=0)  # Within bounds: 1.375 = 37.5% through cycle
+        result = meter.get_musical_time(1.375, reference_level=0)  # 1.375s = 2nd cycle, beat 1, subdivision 2 (exactly on pulse)
         
         assert result is not False
         assert result.cycle_number == 1  # Second cycle
-        assert result.hierarchical_position == [1]  # Only beat level (beat 2)
-        assert abs(result.fractional_beat - 0.375) < 0.01  # 37.5% through cycle (ref_level=0 = within cycle)
-        assert "C1:1+" in str(result)
+        assert result.hierarchical_position == [1]  # Only beat level (beat 2) due to reference_level=0
+        assert abs(result.fractional_beat - 0.0) < 0.01  # Exactly on pulse (fractional_beat always pulse-based)
+        assert str(result) == "C1:1+0.000"
     
     def test_reference_level_subdivision(self):
         """Test Case 3 from spec: Reference level at subdivision level."""
         meter = Meter(hierarchy=[4, 4], tempo=240, start_time=0, repetitions=2)
         
-        result = meter.get_musical_time(0.375, reference_level=1)  # Beat 1, subdivision 2, halfway through beat
+        result = meter.get_musical_time(0.40625, reference_level=1)  # Beat 1, subdivision 2, halfway between pulses
         
         assert result is not False
         assert result.cycle_number == 0
         assert result.hierarchical_position == [1, 2]  # Beat 2, subdivision 3
-        assert abs(result.fractional_beat - 0.5) < 0.01  # 50% through beat (ref_level=1 = within beat)
+        assert abs(result.fractional_beat - 0.5) < 0.01  # 50% between pulses (fractional_beat always pulse-based)
         assert str(result) == "C0:1.2+0.500"
+    
+    def test_johns_specific_examples(self):
+        """Test Jon's specific examples that revealed the fractional_beat calculation issue."""
+        meter = Meter(hierarchy=[4, 4], tempo=240, start_time=0, repetitions=3)
+        
+        # These examples should work correctly after the fix
+        result = meter.get_musical_time(0.5)
+        assert str(result) == "C0:2.0+0.000", f"Expected C0:2.0+0.000, got {result}"
+        
+        result = meter.get_musical_time(0.25)
+        assert str(result) == "C0:1.0+0.000", f"Expected C0:1.0+0.000, got {result}"
+        
+        result = meter.get_musical_time(0.125)
+        assert str(result) == "C0:0.2+0.000", f"Expected C0:0.2+0.000, got {result}"
+        
+        result = meter.get_musical_time(0.0625)
+        assert str(result) == "C0:0.1+0.000", f"Expected C0:0.1+0.000, got {result}"
+        
+        result = meter.get_musical_time(0.03125)
+        assert str(result) == "C0:0.0+0.500", f"Expected C0:0.0+0.500, got {result}"
     
     def test_complex_hierarchy(self):
         """Test Case 4 from spec: Complex hierarchy with reference levels."""
@@ -328,7 +348,7 @@ class TestEdgeCases:
         result = meter.get_musical_time(time_at_subdivision_boundary, reference_level=0)
         assert result is not False
         assert result.beat == 0
-        assert abs(result.fractional_beat - 0.4995) < 0.001  # 49.95% through cycle (ref_level=0 = within cycle)
+        assert abs(result.fractional_beat - 0.997) < 0.01  # 99.7% between pulses (fractional_beat always pulse-based)
         
         # Same time with subdivision reference should handle overflow correctly
         result = meter.get_musical_time(time_at_subdivision_boundary, reference_level=1)
