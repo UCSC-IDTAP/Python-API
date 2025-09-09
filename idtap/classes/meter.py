@@ -566,6 +566,46 @@ class Meter:
         
         return parent_duration / level_size
     
+    def _calculate_proportional_fractional_beat(self, positions: List[int], cycle_number: int, real_time: float) -> float:
+        """Calculate fractional beat using proportional timing when pulse data is sparse."""
+        # Calculate the start time of the current finest-level unit
+        cycle_start_time = self.start_time + cycle_number * self.cycle_dur
+        
+        # Calculate duration of finest-level unit (pulse duration)
+        pulse_duration = self.cycle_dur / self._pulses_per_cycle
+        
+        # Find position within the finest-level unit using hierarchical positions
+        cumulative_time = 0.0
+        current_duration = self.cycle_dur  # Start with full cycle duration
+        
+        for level in range(len(positions)):
+            level_size = self.hierarchy[level]
+            if isinstance(level_size, list):
+                level_size = sum(level_size)
+            
+            # Duration of each unit at this level
+            unit_duration = current_duration / level_size
+            
+            # Add time offset for this level
+            cumulative_time += positions[level] * unit_duration
+            
+            # Update duration for next level (duration of current unit)
+            current_duration = unit_duration
+        
+        # Start time of current finest-level unit
+        current_unit_start_time = cycle_start_time + cumulative_time
+        
+        # Calculate fractional position within this unit
+        time_from_unit_start = real_time - current_unit_start_time
+        
+        if current_duration <= 0:
+            return 0.0
+        
+        fractional_position = time_from_unit_start / current_duration
+        
+        # Clamp to [0, 1] range
+        return max(0.0, min(1.0, fractional_position))
+    
     def get_musical_time(self, real_time: float, reference_level: Optional[int] = None) -> Union['MusicalTime', Literal[False]]:
         """
         Convert real time to musical time within this meter.
@@ -623,28 +663,38 @@ class Meter:
         # Step 4: Fractional beat calculation
         # ALWAYS calculate fractional_beat as position within finest level unit (between pulses)
         # This is independent of reference_level, which only affects hierarchical_position truncation
-        current_pulse_index = self._hierarchical_position_to_pulse_index(positions, cycle_number)
         
-        # Bounds checking
-        if current_pulse_index < 0 or current_pulse_index >= len(self.all_pulses):
-            fractional_beat = 0.0
+        # Check if we have sufficient pulse data for accurate calculation
+        expected_pulses = self._pulses_per_cycle * self.repetitions
+        if len(self.all_pulses) < expected_pulses * 0.5:  # Less than 50% of expected pulses
+            # Fall back to proportional fractional beat calculation for sparse pulse data
+            fractional_beat = self._calculate_proportional_fractional_beat(positions, cycle_number, real_time)
         else:
-            current_pulse_time = self.all_pulses[current_pulse_index].real_time
+            # Use pulse-based calculation when we have sufficient pulse data
+            current_pulse_index = self._hierarchical_position_to_pulse_index(positions, cycle_number)
             
-            # Handle next pulse
-            if current_pulse_index + 1 < len(self.all_pulses):
-                next_pulse_time = self.all_pulses[current_pulse_index + 1].real_time
+            # Bounds checking
+            if current_pulse_index < 0 or current_pulse_index >= len(self.all_pulses):
+                # Even with sufficient overall pulse data, this specific pulse might be missing
+                # Fall back to proportional calculation
+                fractional_beat = self._calculate_proportional_fractional_beat(positions, cycle_number, real_time)
             else:
-                # Last pulse - use next cycle start
-                next_cycle_start = self.start_time + (cycle_number + 1) * self.cycle_dur
-                next_pulse_time = next_cycle_start
-            
-            pulse_duration = next_pulse_time - current_pulse_time
-            if pulse_duration <= 0:
-                fractional_beat = 0.0
-            else:
-                time_from_current_pulse = real_time - current_pulse_time
-                fractional_beat = time_from_current_pulse / pulse_duration
+                current_pulse_time = self.all_pulses[current_pulse_index].real_time
+                
+                # Handle next pulse
+                if current_pulse_index + 1 < len(self.all_pulses):
+                    next_pulse_time = self.all_pulses[current_pulse_index + 1].real_time
+                else:
+                    # Last pulse - use next cycle start
+                    next_cycle_start = self.start_time + (cycle_number + 1) * self.cycle_dur
+                    next_pulse_time = next_cycle_start
+                
+                pulse_duration = next_pulse_time - current_pulse_time
+                if pulse_duration <= 0:
+                    fractional_beat = 0.0
+                else:
+                    time_from_current_pulse = real_time - current_pulse_time
+                    fractional_beat = time_from_current_pulse / pulse_duration
         
         # Clamp to [0, 1] range
         fractional_beat = max(0.0, min(1.0, fractional_beat))
