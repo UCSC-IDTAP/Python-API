@@ -10,11 +10,6 @@ if TYPE_CHECKING:
 MIN_TEMPO_BPM = 20  # Very slow musical pieces (e.g., some alap sections)
 MAX_TEMPO_BPM = 300  # Very fast musical pieces
 
-# Sparse pulse detection threshold
-SPARSE_PULSE_THRESHOLD = 0.5  # Fallback to proportional timing if <50% of expected pulses present
-# When real transcription data has manually annotated pulses, often only key beats
-# are marked rather than all subdivisions. If we have less than this threshold,
-# we can't reliably interpolate between pulses and must use mathematical proportional timing.
 
 
 def find_closest_idxs(trials: List[float], items: List[float]) -> List[int]:
@@ -279,8 +274,6 @@ class Meter:
         self.repetitions = repetitions
         self.pulse_structures: List[List[PulseStructure]] = []
         self._generate_pulse_structures()
-        # Cache for sparse pulse detection (performance optimization)
-        self._is_sparse_cached: Optional[bool] = None
 
     def _validate_parameters(self, opts: Dict) -> None:
         """Validate constructor parameters and provide helpful error messages."""
@@ -481,11 +474,6 @@ class Meter:
     
     def _calculate_level_start_time(self, positions: List[int], cycle_number: int, reference_level: int) -> float:
         """Calculate start time of hierarchical unit at reference level."""
-        # Check if we have sufficient pulse data for accurate calculation
-        expected_pulses = self._pulses_per_cycle * self.repetitions
-        if len(self.all_pulses) < expected_pulses * 0.5:  # Less than 50% of expected pulses
-            # Fall back to proportional timing calculation for sparse pulse data
-            return self._calculate_proportional_level_start_time(positions, cycle_number, reference_level)
         
         # Create positions for start of reference-level unit
         # Ensure we have positions up to reference_level
@@ -496,54 +484,10 @@ class Meter:
         
         start_pulse_index = self._hierarchical_position_to_pulse_index(start_positions, cycle_number)
         
-        # Add bounds checking to prevent IndexError
-        if start_pulse_index < 0 or start_pulse_index >= len(self.all_pulses):
-            # Fall back to proportional calculation
-            return self._calculate_proportional_level_start_time(positions, cycle_number, reference_level)
-        
         return self.all_pulses[start_pulse_index].real_time
-    
-    def _calculate_proportional_level_start_time(self, positions: List[int], cycle_number: int, reference_level: int) -> float:
-        """Calculate level start time using proportional cycle division for sparse pulse data."""
-        cycle_start_time = self.start_time + cycle_number * self.cycle_dur
-        
-        # Calculate proportional position within the cycle for this reference level
-        level_start_positions = list(positions[:reference_level + 1])
-        while len(level_start_positions) < reference_level + 1:
-            level_start_positions.append(0)
-        
-        # Calculate cumulative time offset from cycle start
-        cumulative_time = 0.0
-        current_duration = self.cycle_dur  # Start with full cycle duration
-        
-        for level in range(reference_level + 1):
-            level_size = self.hierarchy[level]
-            if isinstance(level_size, list):
-                level_size = sum(level_size)
-            
-            # Duration of each unit at this level
-            unit_duration = current_duration / level_size
-            
-            if level < len(level_start_positions):
-                position_at_level = level_start_positions[level]
-            else:
-                position_at_level = 0
-                
-            # Add time offset for this level
-            cumulative_time += position_at_level * unit_duration
-            
-            # Update duration for next level (duration of current unit)
-            current_duration = unit_duration
-        
-        return cycle_start_time + cumulative_time
     
     def _calculate_level_duration(self, positions: List[int], cycle_number: int, reference_level: int) -> float:
         """Calculate actual duration of hierarchical unit based on pulse timing."""
-        # Check if we have sufficient pulse data for accurate calculation
-        expected_pulses = self._pulses_per_cycle * self.repetitions
-        if len(self.all_pulses) < expected_pulses * 0.5:  # Less than 50% of expected pulses
-            # Fall back to proportional duration calculation
-            return self._calculate_proportional_level_duration(positions, cycle_number, reference_level)
         
         # Get start time of current unit
         start_time = self._calculate_level_start_time(positions, cycle_number, reference_level)
@@ -558,69 +502,16 @@ class Meter:
             hierarchy_size = sum(hierarchy_size)
             
         if next_positions[reference_level] >= hierarchy_size:
-            # Fall back to proportional calculation for overflow cases
-            return self._calculate_proportional_level_duration(positions, cycle_number, reference_level)
+            # Handle overflow by moving to next cycle
+            next_cycle_number = cycle_number + 1
+            if next_cycle_number >= self.repetitions:
+                # Use meter end time
+                return self.start_time + self.repetitions * self.cycle_dur - start_time
+            next_positions[reference_level] = 0
+            return self._calculate_level_start_time(next_positions, next_cycle_number, reference_level) - start_time
         
         end_time = self._calculate_level_start_time(next_positions, cycle_number, reference_level)
         return end_time - start_time
-    
-    def _calculate_proportional_level_duration(self, positions: List[int], cycle_number: int, reference_level: int) -> float:
-        """Calculate level duration using proportional cycle division."""
-        # Duration of a unit at this reference level is 1/size of that level within its parent
-        level_size = self.hierarchy[reference_level]
-        if isinstance(level_size, list):
-            level_size = sum(level_size)
-        
-        # Calculate the duration of the parent unit
-        if reference_level == 0:
-            # Beat level - parent is the cycle
-            parent_duration = self.cycle_dur
-        else:
-            # Subdivision level - calculate parent unit duration recursively
-            parent_positions = positions[:reference_level]
-            parent_duration = self._calculate_proportional_level_duration(parent_positions, cycle_number, reference_level - 1)
-        
-        return parent_duration / level_size
-    
-    def _calculate_proportional_fractional_beat(self, positions: List[int], cycle_number: int, real_time: float) -> float:
-        """Calculate fractional beat using proportional timing when pulse data is sparse."""
-        # Calculate the start time of the current finest-level unit
-        cycle_start_time = self.start_time + cycle_number * self.cycle_dur
-        
-        # Calculate duration of finest-level unit (pulse duration)
-        pulse_duration = self.cycle_dur / self._pulses_per_cycle
-        
-        # Find position within the finest-level unit using hierarchical positions
-        cumulative_time = 0.0
-        current_duration = self.cycle_dur  # Start with full cycle duration
-        
-        for level in range(len(positions)):
-            level_size = self.hierarchy[level]
-            if isinstance(level_size, list):
-                level_size = sum(level_size)
-            
-            # Duration of each unit at this level
-            unit_duration = current_duration / level_size
-            
-            # Add time offset for this level
-            cumulative_time += positions[level] * unit_duration
-            
-            # Update duration for next level (duration of current unit)
-            current_duration = unit_duration
-        
-        # Start time of current finest-level unit
-        current_unit_start_time = cycle_start_time + cumulative_time
-        
-        # Calculate fractional position within this unit
-        time_from_unit_start = real_time - current_unit_start_time
-        
-        if current_duration <= 0:
-            return 0.0
-        
-        fractional_position = time_from_unit_start / current_duration
-        
-        # Clamp to [0, 1] range
-        return max(0.0, min(1.0, fractional_position))
     
     def get_musical_time(self, real_time: float, reference_level: Optional[int] = None) -> Union['MusicalTime', Literal[False]]:
         """
@@ -679,38 +570,28 @@ class Meter:
         # Step 4: Fractional beat calculation
         # ALWAYS calculate fractional_beat as position within finest level unit (between pulses)
         # This is independent of reference_level, which only affects hierarchical_position truncation
+        current_pulse_index = self._hierarchical_position_to_pulse_index(positions, cycle_number)
         
-        # Check if we have sufficient pulse data for accurate calculation
-        expected_pulses = self._pulses_per_cycle * self.repetitions
-        if len(self.all_pulses) < expected_pulses * 0.5:  # Less than 50% of expected pulses
-            # Fall back to proportional fractional beat calculation for sparse pulse data
-            fractional_beat = self._calculate_proportional_fractional_beat(positions, cycle_number, real_time)
+        # Bounds checking
+        if current_pulse_index < 0 or current_pulse_index >= len(self.all_pulses):
+            fractional_beat = 0.0
         else:
-            # Use pulse-based calculation when we have sufficient pulse data
-            current_pulse_index = self._hierarchical_position_to_pulse_index(positions, cycle_number)
+            current_pulse_time = self.all_pulses[current_pulse_index].real_time
             
-            # Bounds checking
-            if current_pulse_index < 0 or current_pulse_index >= len(self.all_pulses):
-                # Even with sufficient overall pulse data, this specific pulse might be missing
-                # Fall back to proportional calculation
-                fractional_beat = self._calculate_proportional_fractional_beat(positions, cycle_number, real_time)
+            # Handle next pulse
+            if current_pulse_index + 1 < len(self.all_pulses):
+                next_pulse_time = self.all_pulses[current_pulse_index + 1].real_time
             else:
-                current_pulse_time = self.all_pulses[current_pulse_index].real_time
-                
-                # Handle next pulse
-                if current_pulse_index + 1 < len(self.all_pulses):
-                    next_pulse_time = self.all_pulses[current_pulse_index + 1].real_time
-                else:
-                    # Last pulse - use next cycle start
-                    next_cycle_start = self.start_time + (cycle_number + 1) * self.cycle_dur
-                    next_pulse_time = next_cycle_start
-                
-                pulse_duration = next_pulse_time - current_pulse_time
-                if pulse_duration <= 0:
-                    fractional_beat = 0.0
-                else:
-                    time_from_current_pulse = real_time - current_pulse_time
-                    fractional_beat = time_from_current_pulse / pulse_duration
+                # Last pulse - use next cycle start
+                next_cycle_start = self.start_time + (cycle_number + 1) * self.cycle_dur
+                next_pulse_time = next_cycle_start
+            
+            pulse_duration = next_pulse_time - current_pulse_time
+            if pulse_duration <= 0:
+                fractional_beat = 0.0
+            else:
+                time_from_current_pulse = real_time - current_pulse_time
+                fractional_beat = time_from_current_pulse / pulse_duration
         
         # Clamp to [0, 1] range
         fractional_beat = max(0.0, min(1.0, fractional_beat))

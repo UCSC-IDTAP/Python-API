@@ -251,62 +251,6 @@ class TestMeterMusicalTime:
         result_subdiv = meter.get_musical_time(0.125, reference_level=1) 
         assert len(result_subdiv.hierarchical_position) == 2
 
-    def test_sparse_pulse_data_fractional_beat(self):
-        """Test Issue #34: fractional_beat=0.0 for all trajectory points with sparse pulse data."""
-        # Create a meter similar to what would come from Meter.from_json() with sparse pulses
-        meter = Meter(
-            hierarchy=[4, 4],
-            tempo=120,
-            start_time=0.0,
-            repetitions=2
-        )
-        
-        # Simulate sparse pulse data by removing most pulses (keeping only a few)
-        # This mimics the scenario described in Issue #34 where meters from_json() have sparse pulses
-        original_pulse_count = len(meter.all_pulses)
-        expected_pulse_count = meter._pulses_per_cycle * meter.repetitions  # Should be 32
-        
-        # Keep only first few pulses (simulating sparse manual annotations)
-        sparse_pulse_count = max(1, expected_pulse_count // 8)  # Keep ~12% of pulses
-        # Modify the underlying pulse structure to simulate sparse data
-        meter.pulse_structures[-1][0].pulses = meter.pulse_structures[-1][0].pulses[:sparse_pulse_count]
-        
-        print(f"\nTest sparse pulse data (Issue #34):")
-        print(f"  Expected pulses: {expected_pulse_count}")
-        print(f"  Actual pulses: {len(meter.all_pulses)} ({len(meter.all_pulses)/expected_pulse_count*100:.1f}%)")
-        print(f"  Pulse density: {len(meter.all_pulses) / expected_pulse_count:.3f}")
-        
-        # Test various time points that should have different fractional_beat values
-        test_times = [0.1, 0.25, 0.4, 0.6, 0.8, 1.0, 1.3, 1.7, 2.1, 2.5]
-        fractional_beats = []
-        
-        for time_point in test_times:
-            result = meter.get_musical_time(time_point)
-            if result:
-                fractional_beats.append(result.fractional_beat)
-                print(f"  Time {time_point:>4.1f}s: {result} (fractional_beat: {result.fractional_beat:.6f})")
-            else:
-                print(f"  Time {time_point:>4.1f}s: False (out of bounds)")
-        
-        print(f"  Fractional beat values: {[round(f, 6) for f in fractional_beats]}")
-        
-        # Key assertions for Issue #34
-        non_zero_count = sum(1 for f in fractional_beats if f > 0.000001)
-        unique_values = len(set([round(f, 6) for f in fractional_beats]))
-        
-        print(f"  Non-zero fractional_beat count: {non_zero_count}/{len(fractional_beats)}")
-        print(f"  Unique fractional_beat values: {unique_values}")
-        
-        # The current implementation fails these assertions (Issue #34)
-        # After fix, these should pass:
-        if non_zero_count == 0:
-            print("  ❌ ISSUE #34 CONFIRMED: All fractional_beat values are 0.0")
-            print("  This happens because pulse indices are out of bounds with sparse pulse data")
-        else:
-            print("  ✅ Issue #34 appears to be fixed")
-            
-        # We expect variation in fractional_beat values even with sparse pulse data
-        # The fix should use proportional timing when pulse data is insufficient
 
 
 # Additional tests for edge cases
