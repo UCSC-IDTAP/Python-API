@@ -12,6 +12,16 @@ This specification defines the interface and behavior for converting real time (
 4. Provide human-readable musical time representations
 5. Maintain identical behavior across Python and TypeScript implementations
 
+## Pulse-Based Approach
+
+**Critical Design Decision**: This implementation uses a **fully pulse-based approach** rather than theoretical timing calculations. This ensures accurate results when pulse data contains timing variations (rubato):
+
+- **Cycle boundaries**: Determined by actual pulse positions, not `cycleDur` calculations
+- **Hierarchical positions**: Derived from actual pulse found, not theoretical subdivision timing  
+- **Fractional beat**: Uses actual pulse-to-pulse durations, not theoretical `pulseDur`
+
+This approach correctly handles Issue #40 where theoretical calculations returned incorrect cycle numbers at boundaries with rubato timing.
+
 ## Core Data Structures
 
 ### MusicalTime
@@ -40,6 +50,34 @@ Readable: "Cycle 1: Beat 3, Subdivision 2 + 0.500 to next pulse"
 
 ## Core Interface
 
+### Meter.fromTimePoints() [Static Method]
+
+**Signature:**
+```
+fromTimePoints(timePoints: number[], hierarchy: number[], repetitions?: number, layer?: number): Meter
+```
+
+**Purpose:** Create a Meter from actual pulse time points, handling timing variations (rubato).
+
+**Parameters:**
+- `timePoints: number[]` - List of actual pulse times in seconds
+- `hierarchy: number[]` - Meter hierarchy (e.g., [4, 4, 2])
+- `repetitions: number` (optional) - Number of cycle repetitions (default: 1)
+- `layer: number` (optional) - Which hierarchical layer the time points represent (default: 0)
+
+**Features:**
+- **Timing Regularization**: Automatically handles extreme rubato deviations (>40% of pulse duration) by inserting intermediate time points
+- **Pulse Duration Calculation**: Derives tempo from actual timing data
+- **Extrapolation**: Extends pulse data when fewer time points provided than needed
+
+**Algorithm:**
+1. Sort and validate time points
+2. Calculate average pulse duration
+3. Apply timing regularization (insert intermediate points for >40% deviations)
+4. Create theoretical meter with calculated tempo
+5. Adjust all pulses to match actual time points
+6. Extrapolate remaining pulses if needed
+
 ### Meter.getMusicalTime()
 
 **Signature:**
@@ -65,7 +103,8 @@ getMusicalTime(realTime: number, referenceLevel?: number): MusicalTime | false
 
 **Boundaries:**
 - **Start**: `realTime >= meter.startTime`
-- **End**: `realTime < meter.startTime + meter.repetitions * meter.cycleDur`
+- **End**: `realTime < meter.startTime + meter.repetitions * meter.cycleDur` (theoretical end used for boundary validation compatibility)
+- **Internal**: All cycle boundaries determined by actual pulse positions
 
 ## Algorithm Specification
 
@@ -79,65 +118,93 @@ if realTime >= endTime:
     return false
 ```
 
-### Step 2: Cycle Calculation
-```
-relativeTime = realTime - meter.startTime
-cycleNumber = floor(relativeTime / meter.cycleDur)
-cycleOffset = relativeTime % meter.cycleDur
-```
+### Step 2: Pulse-Based Cycle Calculation
 
-### Step 3: Hierarchical Position Calculation
-
-For each level in the hierarchy, calculate the position within that level:
+**Critical**: Use actual pulse timing boundaries, not theoretical calculations. This correctly handles rubato and timing variations:
 
 ```
-positions = []
-remainingTime = cycleOffset
+cycleNumber = null
+cycleOffset = null
 
-totalFinestSubdivisions = meter.getPulsesPerCycle()
-currentGroupSize = totalFinestSubdivisions
-
-for each level in hierarchy:
-    levelSize = hierarchy[level] (or sum if array)
-    currentGroupSize = currentGroupSize / levelSize
-    subdivisionDuration = currentGroupSize * meter.getPulseDur()
+for cycle in range(meter.repetitions):
+    cycleStartPulseIdx = cycle * meter.getPulsesPerCycle()
     
-    positionAtLevel = floor(remainingTime / subdivisionDuration)
-    positions.append(positionAtLevel)
-    
-    remainingTime = remainingTime % subdivisionDuration
+    if cycleStartPulseIdx < meter.allPulses.length:
+        cycleStartTime = meter.allPulses[cycleStartPulseIdx].realTime
+        
+        // Get actual cycle end time using next cycle's first pulse
+        nextCycleStartPulseIdx = (cycle + 1) * meter.getPulsesPerCycle()
+        if nextCycleStartPulseIdx < meter.allPulses.length:
+            cycleEndTime = meter.allPulses[nextCycleStartPulseIdx].realTime
+        else:
+            // Final cycle - use theoretical end
+            cycleEndTime = meter.startTime + meter.repetitions * meter.cycleDur
+        
+        // Check if time falls within this cycle's actual boundaries
+        if cycle == meter.repetitions - 1:
+            // Final cycle: include exact end time
+            if cycleStartTime <= realTime <= cycleEndTime:
+                cycleNumber = cycle
+                cycleOffset = realTime - cycleStartTime
+                break
+        else:
+            // Intermediate cycles: exclude end time (belongs to next cycle)
+            if cycleStartTime <= realTime < cycleEndTime:
+                cycleNumber = cycle
+                cycleOffset = realTime - cycleStartTime
+                break
+
+if cycleNumber == null:
+    throw Error("Unable to determine cycle using pulse data")
+```
+
+### Step 3: Pulse-Based Hierarchical Position Calculation
+
+**Critical**: Find the actual pulse that corresponds to the query time, then derive hierarchical position from that pulse:
+
+```
+// Find the pulse at or before the query time within the current cycle
+cycleStartPulseIdx = cycleNumber * meter.getPulsesPerCycle()
+cycleEndPulseIdx = min((cycleNumber + 1) * meter.getPulsesPerCycle(), meter.allPulses.length)
+
+currentPulseIndex = null
+for pulseIdx in range(cycleStartPulseIdx, cycleEndPulseIdx):
+    if meter.allPulses[pulseIdx].realTime <= realTime:
+        currentPulseIndex = pulseIdx
+    else:
+        break
+
+if currentPulseIndex == null:
+    currentPulseIndex = cycleStartPulseIdx  // Fallback to cycle start
+
+// Derive hierarchical position from the actual pulse found
+positions = pulseIndexToHierarchicalPosition(currentPulseIndex, cycleNumber)
 ```
 
 ### Step 4: Fractional Beat Calculation (Always Pulse-Based)
 
-The fractional beat ALWAYS represents the position between pulses (finest level), regardless of reference level:
+The fractional beat ALWAYS represents the position between pulses (finest level), using the pulse found in Step 3:
 
 ```
-currentPulseIndex = hierarchicalPositionToPulseIndex(positions, cycleNumber)
+// Use the current pulse index found in Step 3
+currentPulseTime = meter.allPulses[currentPulseIndex].realTime
 
-// Bounds checking
-if currentPulseIndex < 0 or currentPulseIndex >= meter.allPulses.length:
-    fractionalBeat = 0.0
-else:
-    currentPulseTime = meter.allPulses[currentPulseIndex].realTime
-    
-    // Handle next pulse (accounting for cycle boundaries)
-    if currentPulseIndex + 1 < meter.allPulses.length:
-        nextPulseTime = meter.allPulses[currentPulseIndex + 1].realTime
-    else:
-        // Last pulse - use next cycle start
-        nextCycleStart = meter.startTime + (cycleNumber + 1) * meter.cycleDur
-        nextPulseTime = nextCycleStart
-    
+// Find next pulse for fractional calculation - always use pulse-based logic
+if currentPulseIndex + 1 < meter.allPulses.length:
+    nextPulseTime = meter.allPulses[currentPulseIndex + 1].realTime
     pulseDuration = nextPulseTime - currentPulseTime
+    
     if pulseDuration <= 0:
         fractionalBeat = 0.0
     else:
         timeFromCurrentPulse = realTime - currentPulseTime
         fractionalBeat = timeFromCurrentPulse / pulseDuration
+else:
+    // This is the last pulse - can't calculate duration
+    fractionalBeat = 0.0
 
-// Clamp to [0, 1] range
-fractionalBeat = max(0.0, min(1.0, fractionalBeat))
+// Clamp to [0, 1) range (exclusive upper bound for MusicalTime)
+fractionalBeat = max(0.0, min(0.9999999999999999, fractionalBeat))
 ```
 
 ### Step 5: Handle Reference Level Truncation

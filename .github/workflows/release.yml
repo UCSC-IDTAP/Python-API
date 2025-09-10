@@ -60,9 +60,17 @@ jobs:
       - name: Check if version bump is needed
         id: release-check
         run: |
-          # Always bump patch version on push to main
-          echo "should_release=true" >> $GITHUB_OUTPUT
-          echo "Version will be bumped"
+          # Check if commit message contains [skip release] or [skip ci]
+          COMMIT_MESSAGE=$(git log -1 --pretty=%B)
+          echo "Latest commit message: $COMMIT_MESSAGE"
+          
+          if echo "$COMMIT_MESSAGE" | grep -q "\[skip release\]\|\[skip ci\]"; then
+            echo "should_release=false" >> $GITHUB_OUTPUT
+            echo "🚫 Skipping release due to [skip release] or [skip ci] in commit message"
+          else
+            echo "should_release=true" >> $GITHUB_OUTPUT
+            echo "✅ Version will be bumped"
+          fi
           
       - name: Run tests
         if: steps.release-check.outputs.should_release == 'true'
