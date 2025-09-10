@@ -562,7 +562,7 @@ class Meter:
             return False
         
         end_time = self.start_time + self.repetitions * self.cycle_dur
-        if real_time >= end_time:
+        if real_time > end_time:
             return False
         
         # Validate reference level
