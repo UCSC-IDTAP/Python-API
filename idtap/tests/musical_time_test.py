@@ -805,3 +805,42 @@ class TestEdgeCases:
         print("\nThis test helps identify if the issue is related to position truncation when")
         print("we're in the middle of subdivisions but reference_level=0 calculation starts")
         print("from the wrong subdivision boundary.")
+
+    def test_issue_36_hierarchical_position_correction(self):
+        """Test fix for Issue #36: hierarchical position calculation bug in multi-cycle meters.
+        
+        Ensures that the hierarchical position calculation always finds a pulse that comes
+        at or before the query time, preventing negative fractional_beat values that get
+        clamped to 0.0.
+        """
+        # Create meter with timing variations that expose the hierarchical calculation bug
+        meter = Meter(hierarchy=[4, 4, 2], start_time=4.0, tempo=60.0, repetitions=4)
+        
+        # Introduce pulse timing variations that can trigger the bug
+        for i, pulse in enumerate(meter.all_pulses):
+            if i % 7 == 0:  # Every 7th pulse gets adjusted timing
+                pulse.real_time += 0.05  # 50ms later - enough to cause issues
+        
+        # Re-sort pulses by time after timing modifications
+        meter.pulse_structures[0][0].pulses.sort(key=lambda p: p.real_time)
+        
+        # Test times that would previously cause fractional_beat=0.0 due to the bug
+        test_times = [5.0, 8.5, 12.2, 16.8]
+        
+        for time in test_times:
+            result = meter.get_musical_time(time)
+            
+            # Should be within meter boundaries
+            assert result is not False, f"Time {time} should be within meter boundaries"
+            
+            # The fix ensures fractional_beat is reasonable (not clamped to 0.0 due to bug)
+            assert 0.0 <= result.fractional_beat < 1.0, f"fractional_beat out of range for time {time}"
+            
+            # Verify hierarchical position points to correct pulse
+            pulse_index = meter._hierarchical_position_to_pulse_index(
+                result.hierarchical_position, result.cycle_number
+            )
+            assert 0 <= pulse_index < len(meter.all_pulses), f"Pulse index should be valid for time {time}"
+            
+            pulse_time = meter.all_pulses[pulse_index].real_time
+            assert pulse_time <= time, f"Calculated pulse should come at/before query time {time}, got {pulse_time}"
