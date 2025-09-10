@@ -164,8 +164,11 @@ class TestMeterMusicalTime:
         result = meter.get_musical_time(end_time - 0.01)
         assert result is not False
         
-        # At or after end
-        assert meter.get_musical_time(end_time) is False
+        # At end (should be valid after Issue #38 fix)
+        result = meter.get_musical_time(end_time)
+        assert result is not False, "Exact end time should be valid (Issue #38 fix)"
+        
+        # After end (should still be invalid)
         assert meter.get_musical_time(end_time + 0.01) is False
     
     def test_reference_level_validation(self):
@@ -844,3 +847,42 @@ class TestEdgeCases:
             
             pulse_time = meter.all_pulses[pulse_index].real_time
             assert pulse_time <= time, f"Calculated pulse should come at/before query time {time}, got {pulse_time}"
+
+    def test_issue_38_cycle_boundary_failures(self):
+        """Test fix for Issue #38: get_musical_time() fails at cycle boundaries.
+        
+        Ensures that get_musical_time() returns valid musical time objects for
+        timestamps at exact cycle boundaries, including the final meter boundary.
+        """
+        # Create meter with multiple cycles to test all boundary types
+        meter = Meter(hierarchy=[4, 4, 2], start_time=0.0, tempo=60.0, repetitions=4)
+        
+        # Test each cycle boundary including the final one
+        for cycle in range(meter.repetitions + 1):
+            boundary_time = meter.start_time + cycle * meter.cycle_dur
+            
+            result = meter.get_musical_time(boundary_time)
+            
+            # All boundaries should return valid musical time objects
+            assert result is not False, f"Cycle boundary at {boundary_time} should return valid musical time"
+            assert 0.0 <= result.fractional_beat < 1.0, f"fractional_beat should be in valid range for boundary {boundary_time}"
+            
+            # Boundary should be treated as start of next cycle (if not final boundary)
+            if cycle < meter.repetitions:
+                assert result.cycle_number == cycle, f"Boundary {boundary_time} should be in cycle {cycle}"
+                assert result.hierarchical_position[0] == 0, f"Boundary should be at start of hierarchical position"
+            else:
+                # Final boundary - should be treated as start of theoretical next cycle
+                assert result.cycle_number == cycle, f"Final boundary should indicate cycle {cycle}"
+        
+        # Test times very close to boundaries to ensure they also work
+        for cycle in range(meter.repetitions):
+            boundary_time = meter.start_time + (cycle + 1) * meter.cycle_dur
+            
+            # Test time just before boundary
+            near_boundary = boundary_time - 0.001
+            result = meter.get_musical_time(near_boundary)
+            assert result is not False, f"Time just before boundary {boundary_time} should be valid"
+            
+            # Should be in the previous cycle
+            assert result.cycle_number == cycle, f"Time before boundary should be in cycle {cycle}"
