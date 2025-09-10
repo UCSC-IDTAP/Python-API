@@ -10,6 +10,12 @@ if TYPE_CHECKING:
 MIN_TEMPO_BPM = 20  # Very slow musical pieces (e.g., some alap sections)
 MAX_TEMPO_BPM = 300  # Very fast musical pieces
 
+# Sparse pulse detection threshold
+SPARSE_PULSE_THRESHOLD = 0.5  # Fallback to proportional timing if <50% of expected pulses present
+# When real transcription data has manually annotated pulses, often only key beats
+# are marked rather than all subdivisions. If we have less than this threshold,
+# we can't reliably interpolate between pulses and must use mathematical proportional timing.
+
 
 def find_closest_idxs(trials: List[float], items: List[float]) -> List[int]:
     """Return indexes of items closest to each trial (greedy)."""
@@ -273,6 +279,8 @@ class Meter:
         self.repetitions = repetitions
         self.pulse_structures: List[List[PulseStructure]] = []
         self._generate_pulse_structures()
+        # Cache for sparse pulse detection (performance optimization)
+        self._is_sparse_cached: Optional[bool] = None
 
     def _validate_parameters(self, opts: Dict) -> None:
         """Validate constructor parameters and provide helpful error messages."""
@@ -364,7 +372,15 @@ class Meter:
 
     @property
     def all_pulses(self) -> List[Pulse]:
-        return self.pulse_structures[-1][0].pulses
+        """Get all pulses from the finest layer (lowest level) of the hierarchy.
+        
+        This concatenates pulses from all pulse structures in the last layer,
+        matching the TypeScript implementation: lastLayer.map(ps => ps.pulses).flat()
+        """
+        if not self.pulse_structures or not self.pulse_structures[-1]:
+            return []
+        # Flatten all pulses from all structures in the finest layer
+        return [pulse for ps in self.pulse_structures[-1] for pulse in ps.pulses]
 
     @property
     def real_times(self) -> List[float]:
