@@ -872,8 +872,8 @@ class TestEdgeCases:
                 assert result.cycle_number == cycle, f"Boundary {boundary_time} should be in cycle {cycle}"
                 assert result.hierarchical_position[0] == 0, f"Boundary should be at start of hierarchical position"
             else:
-                # Final boundary - should be treated as start of theoretical next cycle
-                assert result.cycle_number == cycle, f"Final boundary should indicate cycle {cycle}"
+                # Final boundary - with pulse-based calculation, this falls in the final actual cycle
+                assert result.cycle_number == cycle - 1, f"Final boundary should be in final cycle {cycle - 1} (pulse-based)"
         
         # Test times very close to boundaries to ensure they also work
         for cycle in range(meter.repetitions):
@@ -886,3 +886,50 @@ class TestEdgeCases:
             
             # Should be in the previous cycle
             assert result.cycle_number == cycle, f"Time before boundary should be in cycle {cycle}"
+
+    def test_issue_40_cycle_number_correction(self):
+        """Test fix for Issue #40: get_musical_time() returns incorrect cycle numbers at cycle boundaries.
+        
+        Tests that when pulse data has timing variations (rubato), get_musical_time() uses 
+        actual pulse-based cycle boundaries instead of theoretical boundaries.
+        """
+        # Create meter similar to Issue #40 transcription  
+        meter = Meter(hierarchy=[4, 4, 2], start_time=4.093, tempo=58.3, repetitions=8)
+        
+        # Simulate timing variations by adjusting specific pulses to match Issue #40 boundaries
+        # Issue #40 cycle boundaries:
+        # Cycle 3: 16.597 - 20.727 (time 20.601 should be in cycle 3, not 4)
+        expected_boundaries = [4.093, 8.350, 12.480, 16.597, 20.727, 24.844, 28.968, 33.121, 37.268]
+        
+        # Adjust pulse timing to match expected boundaries
+        for cycle in range(len(expected_boundaries) - 1):
+            cycle_start_pulse_idx = cycle * meter._pulses_per_cycle
+            if cycle_start_pulse_idx < len(meter.all_pulses):
+                # Set first pulse of each cycle to exact boundary time
+                meter.all_pulses[cycle_start_pulse_idx].real_time = expected_boundaries[cycle]
+                
+                # Adjust remaining pulses in cycle proportionally
+                cycle_duration = expected_boundaries[cycle + 1] - expected_boundaries[cycle]
+                for pulse_in_cycle in range(1, 32):  # Pulses 1-31 in cycle
+                    pulse_idx = cycle_start_pulse_idx + pulse_in_cycle
+                    if pulse_idx < len(meter.all_pulses):
+                        pulse_time = expected_boundaries[cycle] + (pulse_in_cycle * cycle_duration / 32)
+                        meter.all_pulses[pulse_idx].real_time = pulse_time
+        
+        # Re-sort pulses by time after modifications
+        meter.pulse_structures[0][0].pulses.sort(key=lambda p: p.real_time)
+        
+        # Test the specific Issue #40 case: trajectory in cycle 4
+        # Time 20.601 should be in cycle 3 (16.597 - 20.727), not cycle 4
+        test_cases = [
+            (20.600969, 3, "Start of trajectory 'n' - should be cycle 3"),
+            (20.602238, 3, "Part of trajectory 'n' - should be cycle 3"),
+            (20.726, 3, "Just before cycle 4 boundary - should be cycle 3"),  
+            (20.727, 4, "Exactly at cycle 4 boundary - should be cycle 4"),
+        ]
+        
+        for time, expected_cycle, description in test_cases:
+            result = meter.get_musical_time(time)
+            assert result is not False, f"Time {time} should return valid musical time ({description})"
+            assert result.cycle_number == expected_cycle, \
+                f"Time {time}: expected cycle {expected_cycle}, got {result.cycle_number} ({description})"
