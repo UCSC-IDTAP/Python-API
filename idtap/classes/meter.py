@@ -474,9 +474,12 @@ class Meter:
     
     def _pulse_index_to_hierarchical_position(self, pulse_index: int, cycle_number: int) -> List[int]:
         """Convert pulse index back to hierarchical position (reverse of _hierarchical_position_to_pulse_index)."""
-        # Remove cycle offset
-        cycle_offset = cycle_number * self._pulses_per_cycle
-        within_cycle_index = pulse_index - cycle_offset
+        # Use modulo to get within-cycle index regardless of which cycle the pulse belongs to
+        within_cycle_index = pulse_index % self._pulses_per_cycle
+        
+        # Ensure within_cycle_index is non-negative
+        if within_cycle_index < 0:
+            within_cycle_index = 0
         
         positions = []
         remaining_index = within_cycle_index
@@ -496,9 +499,9 @@ class Meter:
                     inner_size = sum(inner_size)
                 group_size = group_size // inner_size
             
-            position_at_level = remaining_index // group_size
+            position_at_level = remaining_index // group_size if group_size > 0 else 0
             positions.append(position_at_level)
-            remaining_index = remaining_index % group_size
+            remaining_index = remaining_index % group_size if group_size > 0 else 0
         
         return positions
     
@@ -561,8 +564,30 @@ class Meter:
         if real_time < self.start_time:
             return False
         
-        end_time = self.start_time + self.repetitions * self.cycle_dur
-        if real_time > end_time:
+        # Calculate proper end time based on actual pulse timing
+        # For intermediate cycles: use actual next cycle start pulse
+        # For final cycle: use theoretical calculation (no next cycle exists)
+        if self.all_pulses and len(self.all_pulses) > 0:
+            # Calculate which cycle this time would fall into
+            relative_time = real_time - self.start_time
+            potential_cycle = int(relative_time // self.cycle_dur)
+            
+            if potential_cycle < self.repetitions - 1:
+                # This is an intermediate cycle - use actual next cycle start pulse
+                next_cycle_first_pulse_index = (potential_cycle + 1) * self._pulses_per_cycle
+                if next_cycle_first_pulse_index < len(self.all_pulses):
+                    actual_end_time = self.all_pulses[next_cycle_first_pulse_index].real_time
+                else:
+                    # Fallback to theoretical if pulse doesn't exist
+                    actual_end_time = self.start_time + self.repetitions * self.cycle_dur
+            else:
+                # This is the final cycle - use theoretical end time
+                actual_end_time = self.start_time + self.repetitions * self.cycle_dur
+        else:
+            # No pulses available - use theoretical calculation
+            actual_end_time = self.start_time + self.repetitions * self.cycle_dur
+        
+        if real_time > actual_end_time:
             return False
         
         # Validate reference level
