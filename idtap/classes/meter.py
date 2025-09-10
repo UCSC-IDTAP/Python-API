@@ -472,6 +472,36 @@ class Meter:
         cycle_offset = cycle_number * self._pulses_per_cycle
         return pulse_index + cycle_offset
     
+    def _pulse_index_to_hierarchical_position(self, pulse_index: int, cycle_number: int) -> List[int]:
+        """Convert pulse index back to hierarchical position (reverse of _hierarchical_position_to_pulse_index)."""
+        # Remove cycle offset
+        cycle_offset = cycle_number * self._pulses_per_cycle
+        within_cycle_index = pulse_index - cycle_offset
+        
+        positions = []
+        remaining_index = within_cycle_index
+        
+        # Work from coarsest to finest level
+        for level in range(len(self.hierarchy)):
+            hierarchy_size = self.hierarchy[level]
+            
+            if isinstance(hierarchy_size, list):
+                hierarchy_size = sum(hierarchy_size)
+            
+            # Calculate how many pulses are in each group at this level
+            group_size = self._pulses_per_cycle
+            for inner_level in range(level + 1):
+                inner_size = self.hierarchy[inner_level]
+                if isinstance(inner_size, list):
+                    inner_size = sum(inner_size)
+                group_size = group_size // inner_size
+            
+            position_at_level = remaining_index // group_size
+            positions.append(position_at_level)
+            remaining_index = remaining_index % group_size
+        
+        return positions
+    
     def _calculate_level_start_time(self, positions: List[int], cycle_number: int, reference_level: int) -> float:
         """Calculate start time of hierarchical unit at reference level."""
         
@@ -550,7 +580,7 @@ class Meter:
         total_finest_subdivisions = self._pulses_per_cycle
         current_group_size = total_finest_subdivisions
         
-        for level, size in enumerate(self.hierarchy):
+        for size in self.hierarchy:
             if isinstance(size, list):
                 size = sum(size)
             
@@ -572,11 +602,25 @@ class Meter:
         # This is independent of reference_level, which only affects hierarchical_position truncation
         current_pulse_index = self._hierarchical_position_to_pulse_index(positions, cycle_number)
         
-        # Bounds checking
+        # Bounds checking and hierarchical position correction
         if current_pulse_index < 0 or current_pulse_index >= len(self.all_pulses):
             fractional_beat = 0.0
         else:
             current_pulse_time = self.all_pulses[current_pulse_index].real_time
+            
+            # FIX: If the calculated pulse comes after the query time, find the correct pulse
+            # This happens when hierarchical position calculation rounds up due to timing variations
+            if current_pulse_time > real_time:
+                # Find the pulse that comes at or before the query time
+                corrected_pulse_index = current_pulse_index
+                while corrected_pulse_index > 0 and self.all_pulses[corrected_pulse_index].real_time > real_time:
+                    corrected_pulse_index -= 1
+                current_pulse_index = corrected_pulse_index
+                current_pulse_time = self.all_pulses[current_pulse_index].real_time
+                
+                # Update positions to reflect the corrected pulse index
+                # This ensures consistency between hierarchical_position and actual pulse used
+                positions = self._pulse_index_to_hierarchical_position(current_pulse_index, cycle_number)
             
             # Handle next pulse
             if current_pulse_index + 1 < len(self.all_pulses):
