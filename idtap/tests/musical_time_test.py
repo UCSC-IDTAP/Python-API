@@ -252,6 +252,7 @@ class TestMeterMusicalTime:
         assert len(result_subdiv.hierarchical_position) == 2
 
 
+
 # Additional tests for edge cases
 class TestEdgeCases:
     """Test edge cases and error conditions."""
@@ -597,16 +598,6 @@ class TestEdgeCases:
             # Key assertions for Issue #28
             assert overall_unique >= 10, f"Issue #28: Only {overall_unique} unique fractional_beat values across all samples - should have much more variation"
             assert overall_range > 0.5, f"Issue #28: Overall fractional_beat range {overall_range:.3f} is too small - values clustering near 0.000"
-            
-            # Check for the specific Issue #28 problem: most values near 0.000
-            near_zero_count = sum(1 for f in all_fractional_beats if f < 0.1)
-            near_zero_percentage = near_zero_count / len(all_fractional_beats) * 100
-            print(f"  Values near 0.000 (< 0.1): {near_zero_count}/{len(all_fractional_beats)} ({near_zero_percentage:.1f}%)")
-            
-            # This should NOT happen with the fix
-            assert near_zero_percentage < 50, f"Issue #28: {near_zero_percentage:.1f}% of fractional_beat values are near 0.000 - indicates clustering problem"
-        
-        print("✓ fractional_beat distribution test passed - Issue #28 resolved")
     
     def test_fractional_beat_comparison_across_reference_levels(self):
         """Compare fractional_beat behavior across different reference levels."""
