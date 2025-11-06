@@ -102,6 +102,20 @@ class Piece:
                     inst_list.append(i)
         self.instrumentation = inst_list
 
+        # Initialize trackTitles (after instrumentation is set)
+        track_titles = opts.get('trackTitles')
+        if track_titles is not None:
+            self.track_titles = list(track_titles)  # Create a copy
+        else:
+            # Create empty strings for each instrument track
+            self.track_titles = [''] * len(self.instrumentation)
+
+        # Ensure trackTitles array matches instrumentation length
+        while len(self.track_titles) < len(self.instrumentation):
+            self.track_titles.append('')
+        while len(self.track_titles) > len(self.instrumentation):
+            self.track_titles.pop()
+
         self.possible_trajs: Dict[Instrument, List[int]] = {
             Instrument.Sitar: list(range(14)),
             Instrument.Vocal_M: [0, 1, 2, 3, 4, 5, 6, 12, 13],
@@ -215,12 +229,13 @@ class Piece:
             
         # Define allowed parameter names
         allowed_keys = {
-            'raga', 'instrumentation', 'phraseGrid', 'phrases', 'title', 'dateCreated', 
-            'dateModified', 'location', '_id', 'audioID', 'audio_DB_ID', 'userID', 'name', 
-            'family_name', 'given_name', 'permissions', 'soloist', 'soloInstrument', 
-            'explicitPermissions', 'meters', 'sectionStartsGrid', 'sectionStarts', 
-            'sectionCatGrid', 'sectionCategorization', 'adHocSectionCatGrid', 'excerptRange', 
-            'assemblageDescriptors', 'collections', 'durTot', 'durArrayGrid', 'durArray'
+            'raga', 'instrumentation', 'phraseGrid', 'phrases', 'title', 'dateCreated',
+            'dateModified', 'location', '_id', 'audioID', 'audio_DB_ID', 'userID', 'name',
+            'family_name', 'given_name', 'permissions', 'soloist', 'soloInstrument',
+            'explicitPermissions', 'meters', 'sectionStartsGrid', 'sectionStarts',
+            'sectionCatGrid', 'sectionCategorization', 'adHocSectionCatGrid', 'excerptRange',
+            'assemblageDescriptors', 'collections', 'durTot', 'durArrayGrid', 'durArray',
+            'trackTitles'
         }
         provided_keys = set(opts.keys())
         invalid_keys = provided_keys - allowed_keys
@@ -343,7 +358,14 @@ class Piece:
                 raise TypeError(f"Parameter 'collections' must be a list, got {type(opts['collections']).__name__}")
             if not all(isinstance(item, str) for item in opts['collections']):
                 raise TypeError("All items in 'collections' must be strings")
-        
+
+        # Validate trackTitles
+        if 'trackTitles' in opts and opts['trackTitles'] is not None:
+            if not isinstance(opts['trackTitles'], list):
+                raise TypeError(f"Parameter 'trackTitles' must be a list, got {type(opts['trackTitles']).__name__}")
+            if not all(isinstance(title, str) for title in opts['trackTitles']):
+                raise TypeError("All items in 'trackTitles' must be strings")
+
         # Handle excerptRange specially since it can be dict or list
         if 'excerptRange' in opts and opts['excerptRange'] is not None:
             if not isinstance(opts['excerptRange'], (list, dict)):
@@ -1311,6 +1333,7 @@ class Piece:
             "raga": self.raga.to_json(),
             "phraseGrid": [[p.to_json() for p in row] for row in self.phrase_grid],
             "instrumentation": [i.value if isinstance(i, Instrument) else i for i in self.instrumentation],
+            "trackTitles": self.track_titles,
             "durTot": self.dur_tot,
             "durArrayGrid": self.dur_array_grid,
             "meters": [m.to_json() for m in self.meters],

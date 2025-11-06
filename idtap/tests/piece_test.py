@@ -906,3 +906,162 @@ def test_piece_serialization_reconnects_groups_and_fixes_slide():
     assert reconstructed.trajectories[0] is clone.phrases[0].trajectory_grid[0][0]
     assert reconstructed.trajectories[1] is clone.phrases[0].trajectory_grid[0][1]
     assert clone.phrases[0].trajectory_grid[0][0].articulations['0.00'].name == 'pluck'
+
+
+# ----------------------------------------------------------------------
+# Track Titles Tests (Issue #44)
+# ----------------------------------------------------------------------
+
+def test_track_titles_default_initialization():
+    """Test that trackTitles defaults to empty strings matching instrumentation length."""
+    raga = Raga()
+    phrase = Phrase({'trajectories': [Trajectory({'dur_tot': 1})], 'raga': raga})
+
+    # Single instrument
+    piece = Piece({
+        'phrases': [phrase],
+        'instrumentation': [Instrument.Sitar],
+        'raga': raga
+    })
+    assert piece.track_titles == ['']
+
+    # Multiple instruments
+    piece_multi = Piece({
+        'phraseGrid': [[phrase], [phrase]],
+        'instrumentation': [Instrument.Sitar, Instrument.Vocal_M],
+        'raga': raga
+    })
+    assert piece_multi.track_titles == ['', '']
+
+
+def test_track_titles_explicit_values():
+    """Test trackTitles with explicit values provided."""
+    raga = Raga()
+    phrase = Phrase({'trajectories': [Trajectory({'dur_tot': 1})], 'raga': raga})
+
+    piece = Piece({
+        'phraseGrid': [[phrase], [phrase], [phrase]],
+        'instrumentation': [Instrument.Sarangi, Instrument.Sarangi, Instrument.Sarangi],
+        'trackTitles': ['Lead Melody', 'Harmony', 'Drone'],
+        'raga': raga
+    })
+    assert piece.track_titles == ['Lead Melody', 'Harmony', 'Drone']
+
+
+def test_track_titles_length_synchronization_shorter():
+    """Test that shorter trackTitles array is padded with empty strings."""
+    raga = Raga()
+    phrase = Phrase({'trajectories': [Trajectory({'dur_tot': 1})], 'raga': raga})
+
+    piece = Piece({
+        'phraseGrid': [[phrase], [phrase], [phrase]],
+        'instrumentation': [Instrument.Sarangi, Instrument.Sarangi, Instrument.Sarangi],
+        'trackTitles': ['Lead'],
+        'raga': raga
+    })
+    assert len(piece.track_titles) == 3
+    assert piece.track_titles == ['Lead', '', '']
+
+
+def test_track_titles_length_synchronization_longer():
+    """Test that longer trackTitles array is truncated to match instrumentation."""
+    raga = Raga()
+    phrase = Phrase({'trajectories': [Trajectory({'dur_tot': 1})], 'raga': raga})
+
+    piece = Piece({
+        'phrases': [phrase],
+        'instrumentation': [Instrument.Sitar],
+        'trackTitles': ['Main', 'Extra', 'Another'],
+        'raga': raga
+    })
+    assert len(piece.track_titles) == 1
+    assert piece.track_titles == ['Main']
+
+
+def test_track_titles_type_validation_not_list():
+    """Test that non-list trackTitles raises TypeError."""
+    raga = Raga()
+    phrase = Phrase({'trajectories': [Trajectory({'dur_tot': 1})], 'raga': raga})
+
+    with pytest.raises(TypeError, match="Parameter 'trackTitles' must be a list"):
+        Piece({
+            'phrases': [phrase],
+            'instrumentation': [Instrument.Sitar],
+            'trackTitles': 'not a list',
+            'raga': raga
+        })
+
+
+def test_track_titles_type_validation_non_string_items():
+    """Test that trackTitles with non-string items raises TypeError."""
+    raga = Raga()
+    phrase = Phrase({'trajectories': [Trajectory({'dur_tot': 1})], 'raga': raga})
+
+    with pytest.raises(TypeError, match="All items in 'trackTitles' must be strings"):
+        Piece({
+            'phrases': [phrase],
+            'instrumentation': [Instrument.Sitar],
+            'trackTitles': [123],
+            'raga': raga
+        })
+
+
+def test_track_titles_serialization_round_trip():
+    """Test that trackTitles survives serialization and deserialization."""
+    raga = Raga()
+    phrase = Phrase({'trajectories': [Trajectory({'dur_tot': 1})], 'raga': raga})
+
+    piece = Piece({
+        'phraseGrid': [[phrase], [phrase]],
+        'instrumentation': [Instrument.Sitar, Instrument.Sarangi],
+        'trackTitles': ['Melody', 'Harmony'],
+        'raga': raga
+    })
+
+    # Serialize and deserialize
+    json_obj = piece.to_json()
+    assert 'trackTitles' in json_obj
+    assert json_obj['trackTitles'] == ['Melody', 'Harmony']
+
+    copy = Piece.from_json(json_obj)
+    assert copy.track_titles == ['Melody', 'Harmony']
+
+    # Round trip again
+    assert copy.to_json()['trackTitles'] == piece.to_json()['trackTitles']
+
+
+def test_track_titles_empty_string_values():
+    """Test that empty strings are valid trackTitles values."""
+    raga = Raga()
+    phrase = Phrase({'trajectories': [Trajectory({'dur_tot': 1})], 'raga': raga})
+
+    piece = Piece({
+        'phraseGrid': [[phrase], [phrase]],
+        'instrumentation': [Instrument.Sitar, Instrument.Vocal_M],
+        'trackTitles': ['', ''],
+        'raga': raga
+    })
+    assert piece.track_titles == ['', '']
+
+
+def test_track_titles_sarangi_trio_use_case():
+    """Test the sarangi trio use case from the issue."""
+    raga = Raga()
+    phrase = Phrase({'trajectories': [Trajectory({'dur_tot': 1})], 'raga': raga})
+
+    piece = Piece({
+        'phraseGrid': [[phrase], [phrase], [phrase]],
+        'instrumentation': [Instrument.Sarangi, Instrument.Sarangi, Instrument.Sarangi],
+        'trackTitles': ['Lead Melody', 'Harmony', 'Drone'],
+        'raga': raga
+    })
+
+    assert len(piece.track_titles) == len(piece.instrumentation)
+    assert piece.track_titles[0] == 'Lead Melody'
+    assert piece.track_titles[1] == 'Harmony'
+    assert piece.track_titles[2] == 'Drone'
+
+    # Verify serialization preserves the titles
+    json_obj = piece.to_json()
+    copy = Piece.from_json(json_obj)
+    assert copy.track_titles == piece.track_titles
