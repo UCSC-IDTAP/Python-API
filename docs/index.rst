@@ -45,6 +45,7 @@ Features
 * **OAuth Authentication** - Secure Google OAuth integration with token storage
 * **Rich Data Models** - Comprehensive classes for musical transcription data
 * **Audio Management** - Upload, download, and manage audio files
+* **Spectrogram Analysis** - CQT spectrogram visualization with matplotlib integration
 * **Export Capabilities** - Export transcriptions to JSON and Excel formats
 * **Permissions System** - Manage public/private visibility and sharing
 
