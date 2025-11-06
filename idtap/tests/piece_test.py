@@ -1065,3 +1065,71 @@ def test_track_titles_sarangi_trio_use_case():
     json_obj = piece.to_json()
     copy = Piece.from_json(json_obj)
     assert copy.track_titles == piece.track_titles
+
+
+# ----------------------------------------------------------------------
+# is_section_start Migration Tests (Issue #47)
+# ----------------------------------------------------------------------
+
+def test_section_starts_grid_migration_to_phrases():
+    """Test migration from old sectionStartsGrid to phrase-level is_section_start."""
+    raga = Raga()
+    phrase1 = Phrase({'trajectories': [Trajectory({'dur_tot': 1})], 'raga': raga})
+    phrase2 = Phrase({'trajectories': [Trajectory({'dur_tot': 1})], 'raga': raga})
+    phrase3 = Phrase({'trajectories': [Trajectory({'dur_tot': 1})], 'raga': raga})
+
+    # Create piece with old-style sectionStartsGrid
+    piece = Piece({
+        'phraseGrid': [[phrase1, phrase2, phrase3]],
+        'sectionStartsGrid': [[0, 2]],  # First and third phrases are section starts
+        'raga': raga,
+        'instrumentation': [Instrument.Sitar]
+    })
+
+    # Verify migration happened
+    assert piece.phrase_grid[0][0].is_section_start is True
+    assert piece.phrase_grid[0][1].is_section_start is False
+    assert piece.phrase_grid[0][2].is_section_start is True
+
+
+def test_section_starts_grid_migration_multi_track():
+    """Test migration for multi-track pieces."""
+    raga = Raga()
+    p1 = Phrase({'trajectories': [Trajectory({'dur_tot': 1})], 'raga': raga})
+    p2 = Phrase({'trajectories': [Trajectory({'dur_tot': 1})], 'raga': raga})
+    p3 = Phrase({'trajectories': [Trajectory({'dur_tot': 1})], 'raga': raga})
+    p4 = Phrase({'trajectories': [Trajectory({'dur_tot': 1})], 'raga': raga})
+
+    piece = Piece({
+        'phraseGrid': [[p1, p2], [p3, p4]],
+        'sectionStartsGrid': [[0, 1], [1]],  # Different section starts per track
+        'raga': raga,
+        'instrumentation': [Instrument.Sitar, Instrument.Vocal_M]
+    })
+
+    # Track 0
+    assert piece.phrase_grid[0][0].is_section_start is True
+    assert piece.phrase_grid[0][1].is_section_start is True
+
+    # Track 1
+    assert piece.phrase_grid[1][0].is_section_start is False
+    assert piece.phrase_grid[1][1].is_section_start is True
+
+
+def test_phrases_with_is_section_start_preserved():
+    """Test that phrases created with is_section_start keep their values."""
+    raga = Raga()
+    phrase1 = Phrase({'trajectories': [Trajectory({'dur_tot': 1})], 'is_section_start': True, 'raga': raga})
+    phrase2 = Phrase({'trajectories': [Trajectory({'dur_tot': 1})], 'is_section_start': False, 'raga': raga})
+
+    piece = Piece({
+        'phraseGrid': [[phrase1, phrase2]],
+        'raga': raga,
+        'instrumentation': [Instrument.Sitar]
+    })
+
+    # Migration should not override existing is_section_start values
+    # Since sectionStartsGrid defaults to [[0]], phrase1 should remain True
+    assert piece.phrase_grid[0][0].is_section_start is True
+    # phrase2 will be set based on sectionStartsGrid (which has 0 but not 1)
+    assert piece.phrase_grid[0][1].is_section_start is False

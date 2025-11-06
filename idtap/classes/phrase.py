@@ -84,6 +84,9 @@ class Phrase:
         self.piece_idx = opts.get('piece_idx')
         ad_hoc_cat = opts.get('ad_hoc_categorization_grid')
 
+        # Initialize is_section_start (optional boolean)
+        self.is_section_start = opts.get('is_section_start')
+
         trajs: List[Trajectory] = []
         for t in trajectories_in:
             if not isinstance(t, Trajectory):
@@ -161,7 +164,8 @@ class Phrase:
         allowed_keys = {
             'trajectories', 'start_time', 'raga', 'instrumentation', 'trajectory_grid',
             'chikari_grid', 'chikaris', 'groups_grid', 'categorization_grid',
-            'unique_id', 'piece_idx', 'ad_hoc_categorization_grid', 'dur_tot', 'dur_array'
+            'unique_id', 'piece_idx', 'ad_hoc_categorization_grid', 'dur_tot', 'dur_array',
+            'is_section_start'
         }
         provided_keys = set(opts.keys())
         invalid_keys = provided_keys - allowed_keys
@@ -261,7 +265,12 @@ class Phrase:
                 raise TypeError(f"Parameter 'dur_array' must be a list, got {type(opts['dur_array']).__name__}")
             if not all(isinstance(item, (int, float)) for item in opts['dur_array']):
                 raise TypeError("All items in 'dur_array' must be numbers")
-    
+
+        # Validate is_section_start
+        if 'is_section_start' in opts and opts['is_section_start'] is not None:
+            if not isinstance(opts['is_section_start'], bool):
+                raise TypeError(f"Parameter 'is_section_start' must be a boolean, got {type(opts['is_section_start']).__name__}")
+
     def _validate_parameter_values(self, opts: Dict[str, Any]) -> None:
         """Validate that parameter values are in valid ranges."""
         if 'start_time' in opts and opts['start_time'] is not None:
@@ -569,6 +578,7 @@ class Phrase:
             'categorizationGrid': self.categorization_grid,
             'uniqueId': self.unique_id,
             'adHocCategorizationGrid': self.ad_hoc_categorization_grid,
+            'isSectionStart': self.is_section_start,
         }
 
     @staticmethod

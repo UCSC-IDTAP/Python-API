@@ -351,3 +351,89 @@ def test_missing_bol_alap_initialized():
     del custom['Elaboration']['Bol Alap']
     phrase = Phrase({'categorization_grid': [custom]})
     assert phrase.categorization_grid[0]['Elaboration']['Bol Alap'] is False
+
+
+# ----------------------------------------------------------------------
+# is_section_start Tests (Issue #47)
+# ----------------------------------------------------------------------
+
+def test_is_section_start_true():
+    """Test phrase with is_section_start = True."""
+    phrase = Phrase({
+        'trajectories': [],
+        'is_section_start': True
+    })
+    assert phrase.is_section_start is True
+
+
+def test_is_section_start_false():
+    """Test phrase with is_section_start = False."""
+    phrase = Phrase({
+        'trajectories': [],
+        'is_section_start': False
+    })
+    assert phrase.is_section_start is False
+
+
+def test_is_section_start_none_default():
+    """Test phrase without is_section_start (defaults to None)."""
+    phrase = Phrase({
+        'trajectories': []
+    })
+    assert phrase.is_section_start is None
+
+
+def test_is_section_start_type_validation():
+    """Test that non-boolean is_section_start raises TypeError."""
+    with pytest.raises(TypeError, match="Parameter 'is_section_start' must be a boolean"):
+        Phrase({
+            'trajectories': [],
+            'is_section_start': 'true'  # String instead of bool
+        })
+
+    with pytest.raises(TypeError, match="Parameter 'is_section_start' must be a boolean"):
+        Phrase({
+            'trajectories': [],
+            'is_section_start': 1  # Integer instead of bool
+        })
+
+
+def test_is_section_start_serialization():
+    """Test that is_section_start is included in serialization."""
+    phrase_true = Phrase({
+        'trajectories': [],
+        'is_section_start': True
+    })
+    json_true = phrase_true.to_json()
+    assert 'isSectionStart' in json_true
+    assert json_true['isSectionStart'] is True
+
+    phrase_false = Phrase({
+        'trajectories': [],
+        'is_section_start': False
+    })
+    json_false = phrase_false.to_json()
+    assert 'isSectionStart' in json_false
+    assert json_false['isSectionStart'] is False
+
+    phrase_none = Phrase({
+        'trajectories': []
+    })
+    json_none = phrase_none.to_json()
+    assert 'isSectionStart' in json_none
+    assert json_none['isSectionStart'] is None
+
+
+def test_is_section_start_round_trip():
+    """Test that is_section_start survives serialization and deserialization."""
+    phrase = Phrase({
+        'trajectories': [Trajectory({'dur_tot': 1})],
+        'is_section_start': True,
+        'raga': Raga()
+    })
+
+    json_obj = phrase.to_json()
+    copy = Phrase.from_json(json_obj)
+
+    assert copy.is_section_start is True
+    assert copy.to_json()['isSectionStart'] == phrase.to_json()['isSectionStart']

@@ -177,6 +177,16 @@ class Piece:
             ss_grid.append([0])
         self.section_starts_grid: List[List[float]] = [sorted(list(s)) for s in ss_grid]
 
+        # Migrate old sectionStartsGrid to phrase-level is_section_start properties
+        # This enables phrase-based section tracking while maintaining backward compatibility
+        if self.section_starts_grid and self.phrase_grid:
+            for inst_idx, phrases in enumerate(self.phrase_grid):
+                if inst_idx < len(self.section_starts_grid):
+                    starts = self.section_starts_grid[inst_idx]
+                    for phrase_idx, phrase in enumerate(phrases):
+                        # Convert indices to integers for comparison
+                        phrase.is_section_start = phrase_idx in [int(s) for s in starts]
+
         sc_grid = opts.get("sectionCatGrid")
         if sc_grid is None:
             section_cat = opts.get("sectionCategorization")
