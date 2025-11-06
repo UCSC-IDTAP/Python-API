@@ -313,6 +313,7 @@ class SpectrogramData:
                     cmap: str = 'viridis',
                     alpha: float = 1.0,
                     zorder: int = 0,
+                    log_freq: bool = True,
                     **imshow_kwargs) -> 'AxesImage':
         """Plot spectrogram on an existing matplotlib axis (for overlays).
 
@@ -325,6 +326,7 @@ class SpectrogramData:
             cmap: Matplotlib colormap name
             alpha: Transparency (0.0-1.0), useful for subtle underlays
             zorder: Drawing order (0 = background, higher = foreground)
+            log_freq: Whether to use logarithmic frequency scale (default: True)
             **imshow_kwargs: Additional arguments passed to ax.imshow()
 
         Returns:
@@ -352,6 +354,12 @@ class SpectrogramData:
             zorder=zorder,
             **imshow_kwargs
         )
+
+        # Set log scale for frequency axis (CQT is log-spaced)
+        if log_freq:
+            ax.set_yscale('log')
+            # Set reasonable y-axis limits
+            ax.set_ylim(self.freq_range[0], self.freq_range[1])
 
         return im
 
@@ -417,7 +425,8 @@ class SpectrogramData:
                      power: float = 1.0,
                      cmap: str = 'viridis',
                      show_colorbar: bool = True,
-                     show_axes: bool = True) -> 'Figure':
+                     show_axes: bool = True,
+                     log_freq: bool = True) -> 'Figure':
         """Generate standalone matplotlib Figure for publication.
 
         Use this for quick visualization. For overlays and custom plots,
@@ -429,6 +438,7 @@ class SpectrogramData:
             cmap: Matplotlib colormap name
             show_colorbar: Whether to show colorbar
             show_axes: Whether to show frequency/time axis labels
+            log_freq: Whether to use logarithmic frequency scale (default: True)
 
         Returns:
             Matplotlib Figure object
@@ -438,7 +448,7 @@ class SpectrogramData:
         fig, ax = plt.subplots(figsize=figsize)
 
         # Use plot_on_axis internally
-        im = self.plot_on_axis(ax, power=power, cmap=cmap)
+        im = self.plot_on_axis(ax, power=power, cmap=cmap, log_freq=log_freq)
 
         if show_axes:
             ax.set_xlabel('Time (s)')
