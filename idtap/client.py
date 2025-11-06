@@ -708,6 +708,28 @@ class SwaraClient:
         endpoint = f"spec_data/{audio_id}/spec_shape.json"
         return self._get(endpoint)
 
+    def get_audio_recording(self, audio_id: str) -> Dict[str, Any]:
+        """Get audio recording metadata by ID.
+
+        Fetches complete recording metadata including duration, musicians,
+        ragas, location, and permissions.
+
+        Args:
+            audio_id: The audio recording ID
+
+        Returns:
+            Dictionary with recording metadata including:
+                - duration: Audio duration in seconds (float)
+                - musicians: Dictionary of performer information
+                - raags: Dictionary of raga information
+                - title: Recording title
+                - etc.
+
+        Raises:
+            requests.HTTPError: If recording not found (404)
+        """
+        return self._get("getAudioRecording", params={"_id": audio_id})
+
     def save_transcription(self, piece: Piece, fill_duration: bool = True) -> Any:
         """Save a transcription piece to the server.
         

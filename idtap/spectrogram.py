@@ -49,10 +49,12 @@ class SpectrogramData:
     # Constants matching web app implementation
     DEFAULT_FREQ_RANGE = (75.0, 2400.0)  # Hz
     DEFAULT_BINS_PER_OCTAVE = 72
+    DEFAULT_TIME_RESOLUTION = 0.015080  # seconds per frame (fallback when DB unavailable)
 
     def __init__(self, data: np.ndarray, audio_id: str,
                  freq_range: Tuple[float, float] = DEFAULT_FREQ_RANGE,
-                 bins_per_octave: int = DEFAULT_BINS_PER_OCTAVE):
+                 bins_per_octave: int = DEFAULT_BINS_PER_OCTAVE,
+                 time_resolution: Optional[float] = None):
         """Initialize SpectrogramData with raw data.
 
         Args:
@@ -60,6 +62,8 @@ class SpectrogramData:
             audio_id: Audio recording ID
             freq_range: Frequency range (min_hz, max_hz)
             bins_per_octave: Number of frequency bins per octave
+            time_resolution: Time resolution in seconds per frame (optional)
+                           If None, uses DEFAULT_TIME_RESOLUTION fallback
         """
         if not isinstance(data, np.ndarray):
             raise TypeError(f"data must be numpy array, got {type(data)}")
@@ -72,19 +76,21 @@ class SpectrogramData:
         self.audio_id = audio_id
         self.freq_range = freq_range
         self.bins_per_octave = bins_per_octave
+        self._time_resolution = time_resolution if time_resolution is not None else self.DEFAULT_TIME_RESOLUTION
 
     @classmethod
     def from_audio_id(cls, audio_id: str, client: Optional['SwaraClient'] = None) -> 'SpectrogramData':
         """Download and load spectrogram data from audio ID.
 
         Fetches compressed spectrogram data from https://swara.studio/spec_data/{audio_id}/
+        and calculates accurate time_resolution from the audio recording duration in the database.
 
         Args:
             audio_id: IDTAP audio recording ID
             client: Optional SwaraClient instance (creates one if not provided)
 
         Returns:
-            SpectrogramData instance
+            SpectrogramData instance with accurate time_resolution
 
         Raises:
             requests.HTTPError: If spectrogram data doesn't exist or download fails
@@ -105,7 +111,19 @@ class SpectrogramData:
         shape = tuple(metadata['shape'])  # [freq_bins, time_frames]
         data = np.frombuffer(decompressed, dtype=np.uint8).reshape(shape)
 
-        return cls(data, audio_id)
+        # Get exact audio duration from recording database
+        time_resolution = None
+        try:
+            recording = client.get_audio_recording(audio_id)
+            audio_duration = recording['duration']
+            time_frames = shape[1]
+            time_resolution = audio_duration / time_frames
+        except Exception:
+            # Fallback to DEFAULT_TIME_RESOLUTION if recording not found
+            # This will be handled by __init__
+            pass
+
+        return cls(data, audio_id, time_resolution=time_resolution)
 
     @classmethod
     def from_piece(cls, piece: 'Piece', client: Optional['SwaraClient'] = None) -> Optional['SpectrogramData']:
@@ -501,12 +519,13 @@ class SpectrogramData:
     def time_resolution(self) -> float:
         """Time resolution in seconds per frame.
 
-        Estimated based on typical CQT parameters for audio sampling.
+        Calculated from audio recording duration in database (when available).
+        Falls back to DEFAULT_TIME_RESOLUTION if recording metadata unavailable.
+
+        Note: Spectrograms always cover the full audio recording, even when
+        the associated Piece transcribes only an excerpt.
         """
-        # Typical hop size for CQT is around 0.01s per frame
-        # This is an approximation - exact value depends on sample rate and hop length
-        # For 44100 Hz sample rate with hop_length=512: 512/44100 ≈ 0.0116s
-        return 0.0116  # seconds per frame (approximate)
+        return self._time_resolution
 
     @property
     def freq_bins(self) -> np.ndarray:
