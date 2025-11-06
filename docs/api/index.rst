@@ -22,6 +22,7 @@ Musical transcription data models:
 
    transcription-models
    audio-models
+   spectrogram
 
 Utilities
 ---------
@@ -55,3 +56,9 @@ Audio Management
 * :class:`idtap.AudioMetadata` - Audio file metadata
 * :class:`idtap.AudioUploadResult` - Upload response
 * :class:`idtap.Musician` - Performer information
+
+Spectrogram Analysis
+~~~~~~~~~~~~~~~~~~~~
+
+* :class:`idtap.SpectrogramData` - CQT spectrogram data and visualization
+* :data:`idtap.SUPPORTED_COLORMAPS` - Available colormap names

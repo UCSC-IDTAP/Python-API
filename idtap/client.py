@@ -684,6 +684,30 @@ class SwaraClient:
         # Save file and return path
         return self.save_audio_file(audio_data, filename, filepath)
 
+    def download_spectrogram_data(self, audio_id: str) -> bytes:
+        """Download gzip-compressed spectrogram data.
+
+        Args:
+            audio_id: The audio recording ID
+
+        Returns:
+            Gzipped binary data containing uint8 spectrogram array
+        """
+        endpoint = f"spec_data/{audio_id}/spec_data.gz"
+        return self._get(endpoint)
+
+    def download_spectrogram_metadata(self, audio_id: str) -> Dict[str, Any]:
+        """Download spectrogram shape metadata.
+
+        Args:
+            audio_id: The audio recording ID
+
+        Returns:
+            Dictionary with 'shape' key: [freq_bins, time_frames]
+        """
+        endpoint = f"spec_data/{audio_id}/spec_shape.json"
+        return self._get(endpoint)
+
     def save_transcription(self, piece: Piece, fill_duration: bool = True) -> Any:
         """Save a transcription piece to the server.
         

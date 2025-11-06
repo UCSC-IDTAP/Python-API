@@ -21,6 +21,7 @@ from .classes.section import Section
 from .classes.trajectory import Trajectory
 
 from .enums import Instrument
+from .spectrogram import SpectrogramData, SUPPORTED_COLORMAPS
 from .audio_models import (
     AudioMetadata,
     AudioUploadResult,
@@ -74,6 +75,9 @@ __all__ = [
     "Trajectory",
     "Instrument",
     "login_google",
+    # Spectrogram
+    "SpectrogramData",
+    "SUPPORTED_COLORMAPS",
     # Audio upload classes
     "AudioMetadata",
     "AudioUploadResult", 
