@@ -16,6 +16,11 @@ The Python API (`idtap`) is a sophisticated client library for interacting with 
 - **Integration tests**: `python python/api_testing/api_test.py` (requires live server auth)
 - Test structure: Complete coverage of data models, client functionality, and authentication
 
+**⚠️ IMPORTANT FOR CLAUDE: Before running the full test suite (`pytest idtap/tests/`), ALWAYS warn Jon first!**
+- Some tests may require browser authorization for OAuth authentication
+- Running tests without warning can waste time waiting for authorization that Jon doesn't realize is needed
+- Best practice: Ask "Ready to run the full test suite? (May require browser authorization)" before executing
+
 ### Build/Package/Publish - AUTOMATED via GitHub Actions
 **⚠️ IMPORTANT: Manual publishing is now automated. See "Automated Version Management" section below.**
 
