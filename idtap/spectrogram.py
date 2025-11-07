@@ -111,6 +111,10 @@ class SpectrogramData:
         shape = tuple(metadata['shape'])  # [freq_bins, time_frames]
         data = np.frombuffer(decompressed, dtype=np.uint8).reshape(shape)
 
+        # Flip frequency axis so row 0 = lowest frequency (matches freq_bins ordering)
+        # Server data has row 0 = highest frequency, but we want row 0 = lowest
+        data = np.flipud(data)
+
         # Get exact audio duration from recording database
         time_resolution = None
         try:
