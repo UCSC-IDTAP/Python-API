@@ -243,7 +243,8 @@ class SpectrogramData:
             cropped_data,
             self.audio_id,
             freq_range=(freq_bins[min_idx], freq_bins[max_idx - 1] if max_idx > min_idx else freq_bins[min_idx]),
-            bins_per_octave=self.bins_per_octave
+            bins_per_octave=self.bins_per_octave,
+            time_resolution=self._time_resolution
         )
 
     def crop_time(self, start_time: Optional[float] = None,
@@ -277,7 +278,8 @@ class SpectrogramData:
             cropped_data,
             self.audio_id,
             freq_range=self.freq_range,
-            bins_per_octave=self.bins_per_octave
+            bins_per_octave=self.bins_per_octave,
+            time_resolution=self._time_resolution
         )
 
     def get_extent(self) -> List[float]:
