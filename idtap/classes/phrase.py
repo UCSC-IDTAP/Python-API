@@ -292,31 +292,6 @@ class Phrase:
             if len(dur_array) > 0 and sum(dur_array) == 0:
                 raise ValueError("'dur_array' cannot have all zero values")
         
-        # Validate grid structure consistency
-        if 'trajectory_grid' in opts and 'instrumentation' in opts:
-            trajectory_grid = opts['trajectory_grid']
-            instrumentation = opts['instrumentation']
-            if len(trajectory_grid) != len(instrumentation):
-                import warnings
-                warnings.warn(f"trajectory_grid has {len(trajectory_grid)} tracks but instrumentation has {len(instrumentation)} instruments. "
-                             "These should typically match.", UserWarning)
-        
-        if 'chikari_grid' in opts and 'instrumentation' in opts:
-            chikari_grid = opts['chikari_grid']
-            instrumentation = opts['instrumentation']
-            if len(chikari_grid) != len(instrumentation):
-                import warnings
-                warnings.warn(f"chikari_grid has {len(chikari_grid)} tracks but instrumentation has {len(instrumentation)} instruments. "
-                             "These should typically match.", UserWarning)
-        
-        if 'groups_grid' in opts and 'instrumentation' in opts:
-            groups_grid = opts['groups_grid']
-            instrumentation = opts['instrumentation']
-            if len(groups_grid) != len(instrumentation):
-                import warnings
-                warnings.warn(f"groups_grid has {len(groups_grid)} tracks but instrumentation has {len(instrumentation)} instruments. "
-                             "These should typically match.", UserWarning)
-        
         # Validate categorization grid structure
         if 'categorization_grid' in opts and opts['categorization_grid'] is not None:
             for i, cat in enumerate(opts['categorization_grid']):
