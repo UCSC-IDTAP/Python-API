@@ -157,3 +157,78 @@ def test_add_time_points():
     m.add_time_points(new_times, 1)
     for nt in new_times:
         assert includes_with_tolerance(m.real_times, nt, 1e-8)
+
+
+# display_tempo tests
+
+def test_display_tempo_simple_hierarchy():
+    """Test display_tempo with a simple 2-layer hierarchy."""
+    # Tintal-like: [[4,4,4,4], 4] with internal tempo 60 BPM
+    m = Meter(hierarchy=[[4, 4, 4, 4], 4], tempo=60)
+    # Display tempo should be 60 * 4 = 240
+    assert m.display_tempo == 240
+
+
+def test_display_tempo_single_layer():
+    """Test display_tempo with single-layer hierarchy."""
+    m = Meter(hierarchy=[4], tempo=120)
+    # For single layer, display tempo equals internal tempo
+    assert m.display_tempo == 120
+
+
+def test_display_tempo_three_layer():
+    """Test display_tempo with a 3-layer hierarchy."""
+    # hierarchy [4, 4, 2] with internal tempo 60 BPM
+    # Layer 1 multiplier = 4
+    # Display tempo = 60 * 4 = 240
+    m = Meter(hierarchy=[4, 4, 2], tempo=60)
+    assert m.display_tempo == 240
+
+
+def test_display_tempo_setter():
+    """Test setting display_tempo."""
+    m = Meter(hierarchy=[[4, 4, 4, 4], 4], tempo=60)
+    assert m.display_tempo == 240
+
+    # Set display tempo to 480
+    m.display_tempo = 480
+    # Internal tempo should now be 480 / 4 = 120
+    assert m.tempo == 120
+    assert m.display_tempo == 480
+
+
+def test_display_tempo_setter_single_layer():
+    """Test setting display_tempo with single-layer hierarchy."""
+    m = Meter(hierarchy=[4], tempo=120)
+    m.display_tempo = 180
+    assert m.tempo == 180
+    assert m.display_tempo == 180
+
+
+def test_get_tempo_at_layer():
+    """Test get_tempo_at_layer helper."""
+    m = Meter(hierarchy=[[4, 4, 4, 4], 4], tempo=60)
+    # Layer 0 tempo = internal tempo = 60
+    assert m.get_tempo_at_layer(0) == 60
+    # Layer 1 tempo = 60 * 4 = 240
+    assert m.get_tempo_at_layer(1) == 240
+
+
+def test_get_tempo_at_layer_out_of_bounds():
+    """Test get_tempo_at_layer with invalid layer."""
+    m = Meter(hierarchy=[4, 4], tempo=60)
+    with pytest.raises(ValueError):
+        m.get_tempo_at_layer(2)
+    with pytest.raises(ValueError):
+        m.get_tempo_at_layer(-1)
+
+
+def test_get_hierarchy_mult():
+    """Test _get_hierarchy_mult helper."""
+    m = Meter(hierarchy=[[4, 4, 4, 4], 4])
+    # Layer 0: [4,4,4,4] -> sum = 16
+    assert m._get_hierarchy_mult(0) == 16
+    # Layer 1: 4
+    assert m._get_hierarchy_mult(1) == 4
+    # Out of bounds returns 1
+    assert m._get_hierarchy_mult(5) == 1
