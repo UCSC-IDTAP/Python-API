@@ -346,6 +346,85 @@ class Meter:
     def cycle_dur(self) -> float:
         return self._pulse_dur * self._pulses_per_cycle
 
+    def _get_hierarchy_mult(self, layer: int) -> int:
+        """Get the multiplier for a given hierarchy layer.
+
+        Handles both simple numbers and complex arrays like [3, 2] -> 5
+
+        Args:
+            layer: The hierarchy layer index
+
+        Returns:
+            The multiplier for that layer (sum if array, value if int)
+        """
+        if layer >= len(self.hierarchy):
+            return 1
+        h = self.hierarchy[layer]
+        if isinstance(h, int):
+            return h
+        else:
+            return sum(h)
+
+    @property
+    def display_tempo(self) -> float:
+        """Get the tempo as displayed in performance practice (at matra/beat level).
+
+        In Hindustani music, the internal tempo is stored at the finest pulse level,
+        but musicians typically think of tempo at layer 1 (the matra/beat level).
+
+        For a hierarchy like [[4,4,4,4], 4] (Tintal) with internal tempo 60 BPM:
+        - Layer 1 multiplier = 4
+        - Display tempo = 60 * 4 = 240 BPM
+
+        For complex hierarchies where layer 1 is an array like [3, 2],
+        sum the elements to get the multiplier (5).
+
+        Returns:
+            The tempo at the matra/beat level (layer 1)
+        """
+        if len(self.hierarchy) < 2:
+            return self.tempo
+        return self.tempo * self._get_hierarchy_mult(1)
+
+    @display_tempo.setter
+    def display_tempo(self, new_tempo: float) -> None:
+        """Set the tempo using the performance practice tempo (at matra/beat level).
+
+        Converts the matra-level tempo back to internal pulse tempo.
+
+        Args:
+            new_tempo: The desired tempo at the matra/beat level
+        """
+        if len(self.hierarchy) < 2:
+            # For single-layer hierarchies, display tempo equals internal tempo
+            self.tempo = new_tempo
+            self._generate_pulse_structures()
+        else:
+            internal_tempo = new_tempo / self._get_hierarchy_mult(1)
+            self.tempo = internal_tempo
+            self._generate_pulse_structures()
+
+    def get_tempo_at_layer(self, layer: int) -> float:
+        """Get the tempo at a specific hierarchical layer.
+
+        Args:
+            layer: The hierarchy layer (0 = coarsest/vibhag, higher = finer subdivisions)
+
+        Returns:
+            The tempo (BPM) at that layer
+
+        Raises:
+            ValueError: If layer is out of bounds
+        """
+        if layer < 0 or layer >= len(self.hierarchy):
+            raise ValueError(f"Layer {layer} is out of bounds for hierarchy with {len(self.hierarchy)} layers")
+
+        # Start with base tempo and multiply by each layer's subdivision
+        result_tempo = self.tempo
+        for i in range(1, layer + 1):
+            result_tempo *= self._get_hierarchy_mult(i)
+        return result_tempo
+
     def _generate_pulse_structures(self) -> None:
         self.pulse_structures = [[]]
         # single layer of pulses for simplified implementation
