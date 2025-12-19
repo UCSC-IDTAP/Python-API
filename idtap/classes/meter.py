@@ -1,10 +1,22 @@
 from __future__ import annotations
-from typing import List, Dict, Optional, Union, Literal, TYPE_CHECKING
+from typing import List, Dict, Optional, Union, Literal, TYPE_CHECKING, TypedDict
 from uuid import uuid4
 import math
 
 if TYPE_CHECKING:
     from .musical_time import MusicalTime
+
+from ..enums import TalaName
+
+
+# Type definitions for tala system
+VibhagaBeat = Union[str, int]  # 'X', 'O', or a number like 2, 3, 4
+
+
+class TalaDefinition(TypedDict):
+    """Definition of a tala preset."""
+    hierarchy: List[Union[int, List[int]]]
+    vibhaga: List[VibhagaBeat]
 
 # Tempo validation constants
 MIN_TEMPO_BPM = 20  # Very slow musical pieces (e.g., some alap sections)
@@ -82,6 +94,18 @@ class Pulse:
             'meterId': self.meter_id,
             'corporeal': self.corporeal,
         }
+
+    @property
+    def lowest_layer(self) -> int:
+        """Get the lowest (finest) layer this pulse belongs to.
+
+        Returns the minimum layer value from all affiliations,
+        or 0 if no affiliations have layer info.
+        """
+        layers = [a.get('layer') for a in self.affiliations if a.get('layer') is not None]
+        if not layers:
+            return 0
+        return min(layers)
 
     def __eq__(self, other: object) -> bool:
         return isinstance(other, Pulse) and self.to_json() == other.to_json()
@@ -259,9 +283,71 @@ class PulseStructure:
 
 
 class Meter:
+    # Tala presets - predefined Hindustani classical music meters
+    tala_presets: Dict[TalaName, TalaDefinition] = {
+        TalaName.Tintal: {
+            'hierarchy': [[4, 4, 4, 4], 4],
+            'vibhaga': ['X', 2, 'O', 3]
+        },
+        TalaName.Tilwada: {
+            'hierarchy': [[4, 4, 4, 4], 4],
+            'vibhaga': ['X', 2, 'O', 3]
+        },
+        TalaName.Jhoomra: {
+            'hierarchy': [[3, 4, 3, 4], 4],
+            'vibhaga': ['X', 2, 'O', 3]
+        },
+        TalaName.AdaChautal: {
+            'hierarchy': [[2, 2, 2, 2, 2, 2, 2], 4],
+            'vibhaga': ['X', 'O', 2, 'O', 3, 4, 'O']
+        },
+        TalaName.Dhamar: {
+            'hierarchy': [[5, 2, 3, 4], 4],
+            'vibhaga': ['X', 2, 'O', 3]
+        },
+        TalaName.DeepchandiThumri: {
+            'hierarchy': [[3, 4, 3, 4], 4],
+            'vibhaga': ['X', 'O', 2, 3]
+        },
+        TalaName.DeepchandiDhrupad: {
+            'hierarchy': [[4, 2, 4, 2], 4],
+            'vibhaga': ['X', 2, 'O', 3]
+        },
+        TalaName.Ektal: {
+            'hierarchy': [[2, 2, 2, 2, 2, 2], 4],
+            'vibhaga': ['X', 'O', 2, 'O', 3, 4]
+        },
+        TalaName.Jhaptal: {
+            'hierarchy': [[2, 3, 2, 3], 4],
+            'vibhaga': ['X', 2, 'O', 3]
+        },
+        TalaName.SoolTaal: {
+            'hierarchy': [[2, 2, 2, 2, 2], 4],
+            'vibhaga': ['X', 2, 'O', 3, 4]
+        },
+        TalaName.Keherwa: {
+            'hierarchy': [4, 4],
+            'vibhaga': ['X', 'O']
+        },
+        TalaName.Rupak: {
+            'hierarchy': [3, 2, 2],
+            'vibhaga': ['X', 2, 3]
+        },
+        TalaName.Tivra: {
+            'hierarchy': [[3, 2, 2], 4],
+            'vibhaga': ['X', 2, 3]
+        },
+        TalaName.Dadra: {
+            'hierarchy': [[3, 3], 4],
+            'vibhaga': ['X', 'O']
+        },
+    }
+
     def __init__(self, hierarchy: Optional[List[int | List[int]]] = None,
                  start_time: float = 0.0, tempo: float = 60.0,
-                 unique_id: Optional[str] = None, repetitions: int = 1) -> None:
+                 unique_id: Optional[str] = None, repetitions: int = 1,
+                 tala_name: Optional[TalaName] = None,
+                 vibhaga: Optional[List[VibhagaBeat]] = None) -> None:
         # Parameter validation
         self._validate_parameters({
             'hierarchy': hierarchy, 'start_time': start_time, 'tempo': tempo,
@@ -272,8 +358,34 @@ class Meter:
         self.tempo = tempo
         self.unique_id = unique_id or str(uuid4())
         self.repetitions = repetitions
+        self.tala_name = tala_name
+        self.vibhaga = vibhaga or []
         self.pulse_structures: List[List[PulseStructure]] = []
         self._generate_pulse_structures()
+
+    @classmethod
+    def from_tala(cls, name: TalaName, start_time: float, tempo: float,
+                  repetitions: int) -> 'Meter':
+        """Create a Meter from a predefined tala preset.
+
+        Args:
+            name: The tala name (e.g., TalaName.Tintal)
+            start_time: Start time in seconds
+            tempo: Tempo in BPM (at matra level)
+            repetitions: Number of tala cycles
+
+        Returns:
+            A Meter configured with the tala preset
+        """
+        preset = cls.tala_presets[name]
+        return cls(
+            hierarchy=preset['hierarchy'],
+            start_time=start_time,
+            tempo=tempo,
+            repetitions=repetitions,
+            tala_name=name,
+            vibhaga=preset['vibhaga']
+        )
 
     def _validate_parameters(self, opts: Dict) -> None:
         """Validate constructor parameters and provide helpful error messages."""
@@ -364,45 +476,6 @@ class Meter:
             return h
         else:
             return sum(h)
-
-    @property
-    def display_tempo(self) -> float:
-        """Get the tempo as displayed in performance practice (at matra/beat level).
-
-        In Hindustani music, the internal tempo is stored at the finest pulse level,
-        but musicians typically think of tempo at layer 1 (the matra/beat level).
-
-        For a hierarchy like [[4,4,4,4], 4] (Tintal) with internal tempo 60 BPM:
-        - Layer 1 multiplier = 4
-        - Display tempo = 60 * 4 = 240 BPM
-
-        For complex hierarchies where layer 1 is an array like [3, 2],
-        sum the elements to get the multiplier (5).
-
-        Returns:
-            The tempo at the matra/beat level (layer 1)
-        """
-        if len(self.hierarchy) < 2:
-            return self.tempo
-        return self.tempo * self._get_hierarchy_mult(1)
-
-    @display_tempo.setter
-    def display_tempo(self, new_tempo: float) -> None:
-        """Set the tempo using the performance practice tempo (at matra/beat level).
-
-        Converts the matra-level tempo back to internal pulse tempo.
-
-        Args:
-            new_tempo: The desired tempo at the matra/beat level
-        """
-        if len(self.hierarchy) < 2:
-            # For single-layer hierarchies, display tempo equals internal tempo
-            self.tempo = new_tempo
-            self._generate_pulse_structures()
-        else:
-            internal_tempo = new_tempo / self._get_hierarchy_mult(1)
-            self.tempo = internal_tempo
-            self._generate_pulse_structures()
 
     def get_tempo_at_layer(self, layer: int) -> float:
         """Get the tempo at a specific hierarchical layer.
@@ -596,13 +669,23 @@ class Meter:
         
         return meter
 
-    @staticmethod  
+    @staticmethod
     def from_json(obj: Dict) -> 'Meter':
+        # Parse tala_name from string if present
+        tala_name = None
+        if obj.get('talaName'):
+            try:
+                tala_name = TalaName(obj['talaName'])
+            except ValueError:
+                pass  # Invalid tala name, leave as None
+
         m = Meter(hierarchy=obj.get('hierarchy'),
                   start_time=obj.get('startTime', 0.0),
                   tempo=obj.get('tempo', 60.0),
                   unique_id=obj.get('uniqueId'),
-                  repetitions=obj.get('repetitions', 1))
+                  repetitions=obj.get('repetitions', 1),
+                  tala_name=tala_name,
+                  vibhaga=obj.get('vibhaga', []))
         m.pulse_structures = [
             [PulseStructure.from_json(ps) for ps in layer]
             for layer in obj.get('pulseStructures', [])
@@ -610,7 +693,7 @@ class Meter:
         return m
 
     def to_json(self) -> Dict:
-        return {
+        result = {
             'uniqueId': self.unique_id,
             'hierarchy': self.hierarchy,
             'startTime': self.start_time,
@@ -619,9 +702,227 @@ class Meter:
             'pulseStructures': [[ps.to_json() for ps in layer]
                                 for layer in self.pulse_structures]
         }
+        # Include tala_name and vibhaga if set
+        if self.tala_name is not None:
+            result['talaName'] = self.tala_name.value
+        if self.vibhaga:
+            result['vibhaga'] = self.vibhaga
+        return result
 
     def __eq__(self, other: object) -> bool:
         return isinstance(other, Meter) and self.to_json() == other.to_json()
+
+    # Segment boundary methods for vibhag-aware operations
+
+    def get_segment_boundary_indices(self) -> List[int]:
+        """Get the indices of matra pulses that are at segment (vibhag) boundaries.
+
+        For Tintal [[4,4,4,4], 4]: returns [0, 4, 8, 12] per cycle
+        For Jhoomra [[3,4,3,4], 4]: returns [0, 3, 7, 10] per cycle
+        Returns empty list if hierarchy[0] is not compound.
+        """
+        # Only applies to tala-style meters with:
+        # 1. A compound first layer (vibhag structure)
+        # 2. At least a second layer (matras within vibhags)
+        if not isinstance(self.hierarchy[0], list) or len(self.hierarchy) < 2:
+            return []
+
+        segment_sizes = self.hierarchy[0]
+        matras_per_cycle = sum(segment_sizes)
+        all_boundaries: List[int] = []
+
+        for cycle in range(self.repetitions):
+            cum_sum = 0
+            for seg in range(len(segment_sizes)):
+                all_boundaries.append(cycle * matras_per_cycle + cum_sum)
+                cum_sum += segment_sizes[seg]
+
+        return all_boundaries
+
+    def get_matra_pulses(self) -> List[Pulse]:
+        """Get only the matra-level pulses (pulses that correspond to matras/beats).
+
+        For a hierarchy like [[4,4,4,4], 4] (Tintal):
+        - Total pulses = 64 (16 matras × 4 subdivisions)
+        - Returns only the 16 matra pulses (every 4th pulse)
+
+        These are the pulses that correspond to beats in the tala structure.
+        """
+        all_pulses = self.all_pulses
+        if len(self.hierarchy) < 2:
+            # Single-layer hierarchy - all pulses are at matra level
+            return all_pulses
+
+        # For multi-layer hierarchy, return every Nth pulse where N is the subdivision factor
+        subdivision = self._bottom_mult
+        if subdivision <= 1:
+            return all_pulses
+
+        return [all_pulses[i] for i in range(0, len(all_pulses), subdivision)]
+
+    def is_segment_boundary(self, pulse: Pulse) -> bool:
+        """Check if a pulse is at a segment (vibhag) boundary."""
+        matra_pulses = self.get_matra_pulses()
+        try:
+            idx = next(i for i, p in enumerate(matra_pulses) if p.unique_id == pulse.unique_id)
+        except StopIteration:
+            return False
+        return idx in self.get_segment_boundary_indices()
+
+    def get_segment_for_matra_index(self, matra_idx: int) -> Optional[Dict[str, int]]:
+        """Get the segment range (start and end matra indices) for a given matra index.
+
+        Returns None if the hierarchy doesn't have compound first layer.
+
+        Args:
+            matra_idx: The matra index to find the segment for
+
+        Returns:
+            Dict with 'start' and 'end' keys, or None
+        """
+        if not isinstance(self.hierarchy[0], list):
+            return None
+
+        boundaries = self.get_segment_boundary_indices()
+        matras_per_cycle = sum(self.hierarchy[0])
+        total_matras = matras_per_cycle * self.repetitions
+
+        # Add the final boundary (end of last segment)
+        all_boundaries = boundaries + [total_matras]
+
+        for i in range(len(all_boundaries) - 1):
+            if all_boundaries[i] <= matra_idx < all_boundaries[i + 1]:
+                return {'start': all_boundaries[i], 'end': all_boundaries[i + 1]}
+
+        return None
+
+    def _offset_pulse_direct(self, pulse: Pulse, offset: float, override: bool = False) -> None:
+        """Direct pulse offset without segment-aware logic.
+
+        Used internally by offset_segment_boundary to avoid recursion.
+
+        Args:
+            pulse: The pulse to offset
+            offset: Time offset in seconds
+            override: If True, allows larger offsets (for segment redistribution)
+        """
+        # Simplified implementation - just adjust the pulse time
+        pulse.real_time += offset
+
+    def offset_segment_boundary(self, pulse: Pulse, offset: float) -> bool:
+        """Offset a segment boundary pulse and proportionally adjust all matra pulses
+        within that segment.
+
+        This makes nudging a vibhag boundary move all the matras within that
+        vibhag proportionally.
+
+        Args:
+            pulse: The pulse to offset (must be at a segment boundary)
+            offset: The time offset in seconds
+
+        Returns:
+            True if segment-aware offset was applied, False if regular offset should be used
+        """
+        matra_pulses = self.get_matra_pulses()
+        try:
+            pulse_idx = next(i for i, p in enumerate(matra_pulses) if p.unique_id == pulse.unique_id)
+        except StopIteration:
+            return False  # Not a matra pulse
+
+        boundaries = self.get_segment_boundary_indices()
+        if pulse_idx not in boundaries:
+            return False  # Not at a segment boundary
+
+        boundary_idx = boundaries.index(pulse_idx)
+
+        # Can't adjust segment before the first boundary (index 0)
+        if boundary_idx == 0:
+            return False
+
+        # Get the PREVIOUS segment (the one that ends at this boundary)
+        prev_boundary_idx = boundaries[boundary_idx - 1]
+        current_boundary_idx = pulse_idx
+
+        # Get the pulses in the previous segment
+        prev_segment_pulses = matra_pulses[prev_boundary_idx:current_boundary_idx]
+
+        if len(prev_segment_pulses) < 1:
+            return False
+
+        # Calculate original previous segment duration
+        prev_segment_start_time = prev_segment_pulses[0].real_time
+        prev_segment_end_time = pulse.real_time
+        original_prev_segment_dur = prev_segment_end_time - prev_segment_start_time
+
+        if original_prev_segment_dur <= 0:
+            return False
+
+        # Calculate new previous segment duration
+        new_prev_segment_dur = original_prev_segment_dur + offset
+
+        if new_prev_segment_dur <= 0:
+            return False  # Would create invalid timing
+
+        # Get the NEXT segment
+        next_boundary_idx = boundaries[boundary_idx + 1] if boundary_idx + 1 < len(boundaries) else None
+        has_next_boundary = next_boundary_idx is not None
+
+        next_segment_pulses: List[Pulse] = []
+        original_next_segment_dur = 0.0
+        new_next_segment_dur = 0.0
+        next_segment_end_time = 0.0
+        original_boundary_time = pulse.real_time
+
+        if has_next_boundary:
+            next_segment_pulses = matra_pulses[current_boundary_idx + 1:next_boundary_idx]
+            next_segment_end_time = matra_pulses[next_boundary_idx].real_time
+            original_next_segment_dur = next_segment_end_time - pulse.real_time
+            new_next_segment_dur = original_next_segment_dur - offset
+
+            if new_next_segment_dur <= 0:
+                return False  # Would create invalid timing
+        else:
+            # Last segment of the meter
+            next_segment_pulses = matra_pulses[current_boundary_idx + 1:]
+            if next_segment_pulses:
+                last_pulse = next_segment_pulses[-1]
+                avg_pulse_dur = (last_pulse.real_time - pulse.real_time) / len(next_segment_pulses)
+                next_segment_end_time = last_pulse.real_time + avg_pulse_dur
+                original_next_segment_dur = next_segment_end_time - pulse.real_time
+                new_next_segment_dur = original_next_segment_dur - offset
+
+                if new_next_segment_dur <= 0:
+                    return False  # Would create invalid timing
+
+        has_next_segment = len(next_segment_pulses) > 0
+
+        # Offset the boundary pulse itself first
+        self._offset_pulse_direct(pulse, offset, True)
+
+        # Reset and evenly space all pulses in the PREVIOUS segment (except the first one)
+        num_prev_pulses = len(prev_segment_pulses)
+        for i in range(1, len(prev_segment_pulses)):
+            p = prev_segment_pulses[i]
+            default_relative_pos = i / num_prev_pulses
+            new_relative_time = prev_segment_start_time + default_relative_pos * new_prev_segment_dur
+            pulse_offset = new_relative_time - p.real_time
+
+            if abs(pulse_offset) > 0.0001:
+                self._offset_pulse_direct(p, pulse_offset, True)
+
+        # Reset and evenly space all pulses in the NEXT segment
+        if has_next_segment and next_segment_pulses:
+            new_boundary_time = original_boundary_time + offset
+            num_next_pulses = len(next_segment_pulses) + 1
+            for i, p in enumerate(next_segment_pulses):
+                default_relative_pos = (i + 1) / num_next_pulses
+                new_relative_time = new_boundary_time + default_relative_pos * new_next_segment_dur
+                pulse_offset = new_relative_time - p.real_time
+
+                if abs(pulse_offset) > 0.0001:
+                    self._offset_pulse_direct(p, pulse_offset, True)
+
+        return True
 
     # Musical time conversion methods
     
