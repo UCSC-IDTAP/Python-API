@@ -154,18 +154,20 @@ class TestSecureTokenStorage:
         """Test that clear_tokens removes all token files."""
         # Mock files exist
         mock_exists.return_value = True
-        
+
         storage = SecureTokenStorage()
-        
-        # Mock keyring operations
-        with patch('idtap.secure_storage.KEYRING_AVAILABLE', True), \
-             patch('idtap.secure_storage.keyring.delete_password') as mock_delete:
-            
+
+        # Create a mock keyring module if it doesn't exist (e.g. keyring not installed)
+        import idtap.secure_storage as ss
+        mock_keyring = MagicMock()
+        with patch.object(ss, 'KEYRING_AVAILABLE', True), \
+             patch.object(ss, 'keyring', mock_keyring, create=True):
+
             result = storage.clear_tokens()
-            
+
             # Verify keyring deletion was attempted
-            mock_delete.assert_called_once()
-            
+            mock_keyring.delete_password.assert_called_once()
+
             # Verify file deletions were attempted
             assert mock_unlink.call_count >= 1  # Should try to delete encrypted and plaintext files
             assert result is True

@@ -530,16 +530,28 @@ def test_all_pitches_pitch_number_option():
 
 def test_update_fundamental_and_chikari_freqs():
     piece, p1, *_ = build_simple_piece_full()
-    base = piece.raga.fundamental
-    assert piece.chikari_freqs(0) == [base * 2, base * 4]
+    # chikari_freqs now returns 4 raga-derived frequencies
+    freqs = piece.chikari_freqs(0)
+    assert len(freqs) == 4
+    cp = piece.raga.chikari_pitches
+    for i, p in enumerate(cp):
+        if p is not None:
+            assert freqs[i] == p.frequency
+        else:
+            assert freqs[i] == 0.0
     piece.update_fundamental(300)
     assert piece.raga.fundamental == 300
     assert p1.trajectories[0].pitches[0].fundamental == 300
     piece.put_raga_in_phrase()
     assert p1.raga is piece.raga
-    chikari = Chikari({'fundamental': piece.raga.fundamental})
-    p1.chikaris['0.00'] = chikari
-    assert piece.chikari_freqs(0) == [c.frequency for c in chikari.pitches[:2]]
+    # After fundamental change, chikari_freqs updates accordingly
+    new_freqs = piece.chikari_freqs(0)
+    assert len(new_freqs) == 4
+    for i, p in enumerate(piece.raga.chikari_pitches):
+        if p is not None:
+            assert new_freqs[i] == p.frequency
+        else:
+            assert new_freqs[i] == 0.0
     nums = [p.numbered_pitch for p in piece.all_pitches()]
     assert piece.highest_pitch_number == max(nums)
     assert piece.lowest_pitch_number == min(nums)
@@ -640,9 +652,15 @@ def test_p_idx_from_group_across_phrases():
 def test_most_recent_traj_and_chikari_freqs():
     piece, _ = build_vocal_piece()
     first_traj = piece.phrase_grid[0][0].trajectories[0]
-    chikari = piece.phrase_grid[0][0].chikaris['0.25']
     assert piece.most_recent_traj(0.6, 0) is first_traj
-    assert piece.chikari_freqs(0) == [c.frequency for c in chikari.pitches[:2]]
+    # chikari_freqs now returns 4 raga-derived frequencies
+    freqs = piece.chikari_freqs(0)
+    assert len(freqs) == 4
+    for i, p in enumerate(piece.raga.chikari_pitches):
+        if p is not None:
+            assert freqs[i] == p.frequency
+        else:
+            assert freqs[i] == 0.0
 
 
 def test_add_meter_overlap_and_remove():
@@ -1133,3 +1151,172 @@ def test_phrases_with_is_section_start_preserved():
     assert piece.phrase_grid[0][0].is_section_start is True
     # phrase2 will be set based on sectionStartsGrid (which has 0 but not 1)
     assert piece.phrase_grid[0][1].is_section_start is False
+
+
+# Polyphonic dual-string tests
+
+def test_all_trajectories_string_idx():
+    """Test that all_trajectories can access different string indices."""
+    raga = Raga()
+    t_main = Trajectory({'id': 0, 'pitches': [Pitch()], 'dur_tot': 1})
+    t_second = Trajectory({'id': 5, 'pitches': [Pitch()], 'dur_tot': 1})
+    phrase = Phrase({
+        'trajectory_grid': [[t_main], [t_second]],
+        'raga': raga,
+    })
+    piece = Piece({
+        'phraseGrid': [[phrase]],
+        'raga': raga,
+        'instrumentation': [Instrument.Sitar],
+    })
+    assert piece.all_trajectories(0, 0) == [t_main]
+    assert piece.all_trajectories(0, 1) == [t_second]
+    # Out of bounds string index returns empty
+    assert piece.all_trajectories(0, 5) == []
+
+
+def test_traj_start_times_string_1():
+    """Test phrase-boundary based timing for string > 0."""
+    raga = Raga()
+    t1_main = Trajectory({'id': 0, 'pitches': [Pitch()], 'dur_tot': 2})
+    t1_second = Trajectory({'id': 12, 'dur_tot': 2, 'start_time': 0})
+    t2_main = Trajectory({'id': 0, 'pitches': [Pitch()], 'dur_tot': 3})
+    t2_second = Trajectory({'id': 5, 'pitches': [Pitch()], 'dur_tot': 3, 'start_time': 0})
+    p1 = Phrase({'trajectory_grid': [[t1_main], [t1_second]], 'raga': raga, 'start_time': 0.0})
+    p2 = Phrase({'trajectory_grid': [[t2_main], [t2_second]], 'raga': raga, 'start_time': 2.0})
+    piece = Piece({
+        'phraseGrid': [[p1, p2]],
+        'raga': raga,
+        'instrumentation': [Instrument.Sitar],
+    })
+    # String 0: cumulative [0.0, 2.0]
+    times_0 = piece.traj_start_times(0, 0)
+    assert times_0 == [0.0, 2.0]
+    # String 1: phrase-boundary [0.0 + 0.0, 2.0 + 0.0]
+    times_1 = piece.traj_start_times(0, 1)
+    assert times_1 == [0.0, 2.0]
+
+
+def test_ensure_string_synchronization():
+    """Test that empty string 1 gets filled with silent trajectory."""
+    raga = Raga()
+    t_main = Trajectory({'id': 0, 'pitches': [Pitch()], 'dur_tot': 2})
+    phrase = Phrase({'trajectories': [t_main], 'raga': raga})
+    piece = Piece({
+        'phraseGrid': [[phrase]],
+        'raga': raga,
+        'instrumentation': [Instrument.Sitar],
+    })
+    piece.ensure_string_synchronization()
+    assert len(phrase.trajectory_grid) >= 2
+    assert len(phrase.trajectory_grid[1]) == 1
+    assert phrase.trajectory_grid[1][0].id == 12  # silent
+    assert phrase.trajectory_grid[1][0].dur_tot == 2
+
+
+def test_ensure_string_synchronization_preserves_content():
+    """Test that non-empty string 1 is preserved."""
+    raga = Raga()
+    t_main = Trajectory({'id': 0, 'pitches': [Pitch()], 'dur_tot': 2})
+    t_second = Trajectory({'id': 5, 'pitches': [Pitch()], 'dur_tot': 2})
+    phrase = Phrase({
+        'trajectory_grid': [[t_main], [t_second]],
+        'raga': raga,
+    })
+    piece = Piece({
+        'phraseGrid': [[phrase]],
+        'raga': raga,
+        'instrumentation': [Instrument.Sitar],
+    })
+    piece.ensure_string_synchronization()
+    # Non-silent content should be preserved
+    assert phrase.trajectory_grid[1] == [t_second]
+
+
+def test_ensure_string_synchronization_skips_vocal():
+    """Test that vocal instruments are not affected."""
+    raga = Raga()
+    t_main = Trajectory({'id': 0, 'pitches': [Pitch()], 'dur_tot': 2})
+    phrase = Phrase({'trajectories': [t_main], 'raga': raga})
+    piece = Piece({
+        'phraseGrid': [[phrase]],
+        'raga': raga,
+        'instrumentation': [Instrument.Vocal_M],
+    })
+    orig_grid_len = len(phrase.trajectory_grid)
+    piece.ensure_string_synchronization()
+    # Vocal instruments should not get string synchronization
+    assert len(phrase.trajectory_grid) == orig_grid_len
+
+
+def test_string_from_traj():
+    """Test finding which string a trajectory belongs to."""
+    raga = Raga()
+    t_main = Trajectory({'id': 0, 'pitches': [Pitch()], 'dur_tot': 1})
+    t_second = Trajectory({'id': 5, 'pitches': [Pitch()], 'dur_tot': 1})
+    phrase = Phrase({
+        'trajectory_grid': [[t_main], [t_second]],
+        'raga': raga,
+    })
+    piece = Piece({
+        'phraseGrid': [[phrase]],
+        'raga': raga,
+        'instrumentation': [Instrument.Sitar],
+    })
+    assert piece.string_from_traj(t_main) == 0
+    assert piece.string_from_traj(t_second) == 1
+
+
+def test_string_from_traj_not_found():
+    """Test ValueError when trajectory not found."""
+    raga = Raga()
+    t = Trajectory({'id': 0, 'pitches': [Pitch()], 'dur_tot': 1})
+    orphan = Trajectory({'id': 1, 'pitches': [Pitch()], 'dur_tot': 1})
+    phrase = Phrase({'trajectories': [t], 'raga': raga})
+    piece = Piece({
+        'phraseGrid': [[phrase]],
+        'raga': raga,
+        'instrumentation': [Instrument.Sitar],
+    })
+    with pytest.raises(ValueError, match="Trajectory not found"):
+        piece.string_from_traj(orphan)
+
+
+def test_section_starts_grid_computed_property():
+    """Test that section_starts_grid is computed from phrase.is_section_start."""
+    raga = Raga()
+    p1 = Phrase({'trajectories': [Trajectory({'dur_tot': 1})], 'is_section_start': True, 'raga': raga})
+    p2 = Phrase({'trajectories': [Trajectory({'dur_tot': 1})], 'is_section_start': False, 'raga': raga})
+    p3 = Phrase({'trajectories': [Trajectory({'dur_tot': 1})], 'is_section_start': True, 'raga': raga})
+    piece = Piece({
+        'phraseGrid': [[p1, p2, p3]],
+        'raga': raga,
+        'instrumentation': [Instrument.Sitar],
+    })
+    assert piece.section_starts_grid == [[0, 2]]
+
+
+def test_section_starts_grid_not_in_to_json():
+    """Verify sectionStartsGrid is not in to_json() output."""
+    raga = Raga()
+    phrase = Phrase({'trajectories': [Trajectory({'dur_tot': 1})], 'raga': raga})
+    piece = Piece({
+        'phraseGrid': [[phrase]],
+        'raga': raga,
+        'instrumentation': [Instrument.Sitar],
+    })
+    json_obj = piece.to_json()
+    assert 'sectionStartsGrid' not in json_obj
+
+
+def test_sarangi_in_possible_trajs():
+    """Verify Sarangi is now in possible_trajs mapping."""
+    raga = Raga()
+    phrase = Phrase({'trajectories': [Trajectory({'dur_tot': 1})], 'raga': raga})
+    piece = Piece({
+        'phraseGrid': [[phrase]],
+        'raga': raga,
+        'instrumentation': [Instrument.Sarangi],
+    })
+    assert Instrument.Sarangi in piece.possible_trajs
+    assert piece.possible_trajs[Instrument.Sarangi] == list(range(14))

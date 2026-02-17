@@ -506,11 +506,35 @@ class Raga:
         return ratios
 
     @property
-    def chikari_pitches(self) -> List[Pitch]:
-        return [
-            Pitch({'swara': 's', 'oct': 2, 'fundamental': self.fundamental}),
-            Pitch({'swara': 's', 'oct': 1, 'fundamental': self.fundamental}),
-        ]
+    def chikari_pitches(self) -> List[Optional[Pitch]]:
+        """Derive 4 chikari pitches from the raga rule set.
+
+        Returns list of 4 pitches (or None for silent strings):
+        [0] Sa oct 2 (always present)
+        [1] Sa oct 1 (always present)
+        [2] Pa oct 1 (present if Pa is in the raga, else None)
+        [3] Ga oct 1 (present if exactly one Ga variant, else None)
+        """
+        ratios = self.stratified_ratios
+
+        sa_high = Pitch({'swara': 'sa', 'oct': 2, 'fundamental': self.fundamental, 'ratios': ratios})
+        sa_low = Pitch({'swara': 'sa', 'oct': 1, 'fundamental': self.fundamental, 'ratios': ratios})
+
+        pa_pitch: Optional[Pitch] = None
+        if self.rule_set.get('pa') is True:
+            pa_pitch = Pitch({'swara': 'pa', 'oct': 1, 'fundamental': self.fundamental, 'ratios': ratios})
+
+        ga_pitch: Optional[Pitch] = None
+        ga_rule = self.rule_set.get('ga')
+        if isinstance(ga_rule, dict):
+            has_lowered = ga_rule.get('lowered', False)
+            has_raised = ga_rule.get('raised', False)
+            if has_lowered and not has_raised:
+                ga_pitch = Pitch({'swara': 'ga', 'oct': 1, 'raised': False, 'fundamental': self.fundamental, 'ratios': ratios})
+            elif has_raised and not has_lowered:
+                ga_pitch = Pitch({'swara': 'ga', 'oct': 1, 'raised': True, 'fundamental': self.fundamental, 'ratios': ratios})
+
+        return [sa_high, sa_low, pa_pitch, ga_pitch]
 
     def get_frequencies(self, low: float = 100, high: float = 800) -> List[float]:
         freqs: List[float] = []

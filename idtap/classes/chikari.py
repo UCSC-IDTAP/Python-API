@@ -92,13 +92,15 @@ class Chikari:
     def to_json(self) -> Dict:
         return {
             'fundamental': self.fundamental,
-            'pitches': [p.to_json() for p in self.pitches],
             'uniqueId': self.unique_id,
         }
 
     @staticmethod
     def from_json(obj: Dict) -> 'Chikari':
         opts = humps.decamelize(obj)
-        pitches = [Pitch.from_json(p) for p in opts.get('pitches', [])]
-        opts['pitches'] = pitches
+        # Handle old format (with pitches) for backward compatibility
+        pitches_data = opts.get('pitches')
+        if pitches_data:
+            pitches = [Pitch.from_json(p) for p in pitches_data]
+            opts['pitches'] = pitches
         return Chikari(opts)  # type: ignore[arg-type]
