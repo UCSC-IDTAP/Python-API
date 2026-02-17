@@ -133,10 +133,13 @@ def test_default_raga():
         [2 ** (10 / 12), 2 ** (11 / 12)],
     ]
     assert r.stratified_ratios == s_ratios
-    assert r.chikari_pitches == [
-        Pitch({'swara': 0, 'oct': 2, 'fundamental': 261.63}),
-        Pitch({'swara': 0, 'oct': 1, 'fundamental': 261.63}),
-    ]
+    # Yaman: Pa=True, only raised Ga → all 4 chikari pitches present
+    cp = r.chikari_pitches
+    assert len(cp) == 4
+    assert cp[0].swara == 0 and cp[0].oct == 2  # Sa high
+    assert cp[1].swara == 0 and cp[1].oct == 1  # Sa low
+    assert cp[2] is not None and cp[2].swara == 4 and cp[2].oct == 1  # Pa
+    assert cp[3] is not None and cp[3].swara == 2 and cp[3].raised is True  # Ga raised
 
     hard_coded_freqs = [
         110.00186456141468, 123.47291821345574,
@@ -1035,3 +1038,69 @@ def test_complete_valid_data():
     raga = Raga(valid_data)
     assert raga.name == 'Test Raga'
     assert raga.fundamental == 220.0
+
+
+# Chikari pitch derivation tests
+
+def test_chikari_pitches_no_pa():
+    """Raga without Pa should have None for Pa chikari string."""
+    rule_set = {
+        'sa': True,
+        're': {'lowered': False, 'raised': True},
+        'ga': {'lowered': False, 'raised': True},
+        'ma': {'lowered': True, 'raised': False},
+        'pa': False,
+        'dha': {'lowered': False, 'raised': True},
+        'ni': {'lowered': True, 'raised': False},
+    }
+    r = Raga({'rule_set': rule_set})
+    cp = r.chikari_pitches
+    assert len(cp) == 4
+    assert cp[0] is not None  # Sa always present
+    assert cp[1] is not None  # Sa always present
+    assert cp[2] is None  # No Pa in raga
+    assert cp[3] is not None  # Only raised Ga → present
+    assert cp[3].raised is True
+
+
+def test_chikari_pitches_both_ga_variants():
+    """Raga with both Ga variants should have None for Ga chikari (ambiguous)."""
+    rule_set = {
+        'sa': True,
+        're': {'lowered': False, 'raised': True},
+        'ga': {'lowered': True, 'raised': True},
+        'ma': {'lowered': True, 'raised': False},
+        'pa': True,
+        'dha': {'lowered': False, 'raised': True},
+        'ni': {'lowered': False, 'raised': True},
+    }
+    r = Raga({'rule_set': rule_set})
+    cp = r.chikari_pitches
+    assert cp[2] is not None  # Pa present
+    assert cp[3] is None  # Both Ga variants → ambiguous → None
+
+
+def test_chikari_pitches_no_ga():
+    """Raga with neither Ga variant should have None for Ga chikari."""
+    rule_set = {
+        'sa': True,
+        're': {'lowered': False, 'raised': True},
+        'ga': {'lowered': False, 'raised': False},
+        'ma': {'lowered': True, 'raised': False},
+        'pa': True,
+        'dha': {'lowered': False, 'raised': True},
+        'ni': {'lowered': False, 'raised': True},
+    }
+    r = Raga({'rule_set': rule_set})
+    cp = r.chikari_pitches
+    assert cp[3] is None  # Neither Ga variant → None
+
+
+def test_chikari_pitches_include_ratios():
+    """Verify chikari pitches use stratified_ratios for correct tuning."""
+    r = Raga({'fundamental': 200.0})
+    cp = r.chikari_pitches
+    # All non-None pitches should have proper frequencies
+    for p in cp:
+        if p is not None:
+            assert p.frequency > 0

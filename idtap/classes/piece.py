@@ -120,6 +120,7 @@ class Piece:
             Instrument.Sitar: list(range(14)),
             Instrument.Vocal_M: [0, 1, 2, 3, 4, 5, 6, 12, 13],
             Instrument.Vocal_F: [0, 1, 2, 3, 4, 5, 6, 12, 13],
+            Instrument.Sarangi: list(range(14)),
         }
 
         first_inst = self.instrumentation[0]
@@ -169,29 +170,33 @@ class Piece:
             else:
                 self.meters.append(Meter.from_json(m))
 
+        # Parse section starts into a local variable, then apply to phrases
         ss_grid = opts.get("sectionStartsGrid")
         if ss_grid is None:
             ss = opts.get("sectionStarts", [0])
             ss_grid = [ss]
         for _ in range(len(ss_grid), len(self.instrumentation)):
             ss_grid.append([0])
-        self.section_starts_grid: List[List[float]] = [sorted(list(s)) for s in ss_grid]
+        ss_grid = [sorted(list(s)) for s in ss_grid]
 
-        # Migrate old sectionStartsGrid to phrase-level is_section_start properties
-        # This enables phrase-based section tracking while maintaining backward compatibility
-        if self.section_starts_grid and self.phrase_grid:
+        # Apply section starts to phrase-level is_section_start flags
+        if ss_grid and self.phrase_grid:
             for inst_idx, phrases in enumerate(self.phrase_grid):
-                if inst_idx < len(self.section_starts_grid):
-                    starts = self.section_starts_grid[inst_idx]
+                if inst_idx < len(ss_grid):
+                    starts = ss_grid[inst_idx]
                     for phrase_idx, phrase in enumerate(phrases):
-                        # Convert indices to integers for comparison
-                        phrase.is_section_start = phrase_idx in [int(s) for s in starts]
+                        if phrase.is_section_start is None:
+                            phrase.is_section_start = phrase_idx in [int(s) for s in starts]
+                # Ensure every phrase has a boolean is_section_start
+                for phrase in phrases:
+                    if phrase.is_section_start is None:
+                        phrase.is_section_start = False
 
         sc_grid = opts.get("sectionCatGrid")
         if sc_grid is None:
             section_cat = opts.get("sectionCategorization")
             sc_grid = []
-            for i, ss in enumerate(self.section_starts_grid):
+            for i, ss in enumerate(ss_grid):
                 if i == 0:
                     if section_cat is not None:
                         for c in section_cat:
@@ -203,7 +208,7 @@ class Piece:
                     row = [init_sec_categorization() for _ in ss]
                 sc_grid.append(row)
         self.section_cat_grid: List[List[SecCatType]] = sc_grid
-        for i, ss in enumerate(self.section_starts_grid):
+        for i, ss in enumerate(ss_grid):
             while len(self.section_cat_grid) <= i:
                 self.section_cat_grid.append([init_sec_categorization() for _ in ss])
             if len(self.section_cat_grid[i]) < len(ss):
@@ -219,7 +224,7 @@ class Piece:
                 [ [f for f in fields if f != ""] for fields in track ]
                 for track in ad_hoc
             ]
-        while len(self.ad_hoc_section_cat_grid) < len(self.section_starts_grid):
+        while len(self.ad_hoc_section_cat_grid) < len(ss_grid):
             self.ad_hoc_section_cat_grid.append([[] for _ in self.ad_hoc_section_cat_grid[0]])
 
         self.excerpt_range = opts.get("excerptRange")
@@ -464,12 +469,26 @@ class Piece:
             self.dur_array_grid[0] = arr
 
     @property
-    def section_starts(self) -> List[float]:
+    def section_starts_grid(self) -> List[List[int]]:
+        """Compute section starts from phrase-level is_section_start flags."""
+        return [[idx for idx, p in enumerate(phrases) if p.is_section_start]
+                for phrases in self.phrase_grid]
+
+    @section_starts_grid.setter
+    def section_starts_grid(self, value: List[List[int]]) -> None:
+        """Apply section starts to phrase-level is_section_start flags."""
+        for inst_idx, starts in enumerate(value):
+            if inst_idx < len(self.phrase_grid):
+                for p_idx, phrase in enumerate(self.phrase_grid[inst_idx]):
+                    phrase.is_section_start = p_idx in [int(s) for s in starts]
+
+    @property
+    def section_starts(self) -> List[int]:
         return self.section_starts_grid[0]
 
     @section_starts.setter
-    def section_starts(self, arr: List[float]) -> None:
-        self.section_starts_grid[0] = arr
+    def section_starts(self, arr: List[int]) -> None:
+        self.section_starts_grid = [arr] + self.section_starts_grid[1:]
 
     @property
     def section_categorization(self) -> List[SecCatType]:
@@ -863,10 +882,18 @@ class Piece:
             self.meters.remove(meter)
 
     # ------------------------------------------------------------------
-    def all_trajectories(self, inst: int = 0) -> List[Trajectory]:
+    def all_trajectories(self, inst: int = 0, string_idx: int = 0) -> List[Trajectory]:
+        """Get all trajectories for a given instrument track and string index.
+
+        Args:
+            inst: Instrument track index (default 0).
+            string_idx: String index within the instrument (default 0).
+                For Sitar/Sarangi, string 0 is main, string 1 is jor/second.
+        """
         trajs: List[Trajectory] = []
         for p in self.phrase_grid[inst]:
-            trajs.extend(p.trajectories)
+            if string_idx < len(p.trajectory_grid):
+                trajs.extend(p.trajectory_grid[string_idx])
         return trajs
 
     # ------------------------------------------------------------------
@@ -895,6 +922,45 @@ class Piece:
             if any(p.unique_id == uid for p in track):
                 return i
         raise ValueError("Phrase not found")
+
+    def string_from_traj(self, traj: Trajectory) -> int:
+        """Determine which string index contains a given trajectory.
+
+        Searches all phrases across all strings by unique_id.
+        Returns the string index (0 or 1). Raises ValueError if not found.
+        """
+        for phrases in self.phrase_grid:
+            for phrase in phrases:
+                for string_idx, string_trajs in enumerate(phrase.trajectory_grid):
+                    for t in string_trajs:
+                        if t.unique_id == traj.unique_id:
+                            return string_idx
+        raise ValueError("Trajectory not found in any string")
+
+    def ensure_string_synchronization(self) -> None:
+        """For Sitar/Sarangi, ensure trajectory_grid[1] exists and is synchronized.
+
+        If string 1 is empty or contains only silent trajectories (id=12),
+        fill it with a single silent trajectory matching the phrase duration.
+        """
+        polyphonic_instruments = {Instrument.Sitar, Instrument.Sarangi}
+        for inst_idx, inst in enumerate(self.instrumentation):
+            if inst not in polyphonic_instruments:
+                continue
+            for phrase in self.phrase_grid[inst_idx]:
+                # Ensure trajectory_grid has at least 2 entries
+                while len(phrase.trajectory_grid) < 2:
+                    phrase.trajectory_grid.append([])
+
+                string_1 = phrase.trajectory_grid[1]
+                is_empty_or_silent = (
+                    len(string_1) == 0 or
+                    all(t.id == 12 for t in string_1)
+                )
+                if is_empty_or_silent:
+                    silent = Trajectory({'id': 12, 'dur_tot': phrase.dur_tot})
+                    phrase.trajectory_grid[1] = [silent]
+                phrase.reset()
 
     def traj_from_uid(self, uid: str, track: int = 0) -> Trajectory:
         for t in self.all_trajectories(track):
@@ -980,14 +1046,12 @@ class Piece:
         return durations_of_fixed_pitches(trajs=self.all_trajectories(inst), output_type=output_type, count_type="proportional")
 
     # ------------------------------------------------------------------
-    def chikari_freqs(self, inst_idx: int) -> List[float]:
-        phrases = self.phrase_grid[inst_idx]
-        for p in phrases:
-            if p.chikaris:
-                chikari = list(p.chikaris.values())[0]
-                return [c.frequency for c in chikari.pitches[:2]]
-        f = self.raga.fundamental
-        return [f * 2, f * 4]
+    def chikari_freqs(self, inst_idx: int = 0) -> List[float]:
+        """Return 4 chikari frequencies derived from the raga.
+
+        Returns 0.0 for strings that are silent (None pitch).
+        """
+        return [p.frequency if p is not None else 0.0 for p in self.raga.chikari_pitches]
 
     # ------------------------------------------------------------------
     def dur_starts(self, track: int = 0) -> List[float]:
@@ -997,12 +1061,26 @@ class Piece:
             raise Exception("durTot is undefined")
         return get_starts([d * self.dur_tot for d in self.dur_array_grid[track]])
 
-    def traj_start_times(self, inst: int = 0) -> List[float]:
-        trajs = self.all_trajectories(inst)
-        times = [0.0]
-        for t in trajs[:-1]:
-            times.append(times[-1] + t.dur_tot)
-        return times
+    def traj_start_times(self, inst: int = 0, string_idx: int = 0) -> List[float]:
+        """Get start times for all trajectories in a given string.
+
+        For string 0: cumulative duration (standard sequential timing).
+        For string > 0: phrase-boundary based (phrase.start_time + traj.start_time).
+        """
+        if string_idx == 0:
+            trajs = self.all_trajectories(inst, 0)
+            times = [0.0]
+            for t in trajs[:-1]:
+                times.append(times[-1] + t.dur_tot)
+            return times
+        else:
+            times: List[float] = []
+            for p in self.phrase_grid[inst]:
+                phrase_start = p.start_time or 0.0
+                if string_idx < len(p.trajectory_grid):
+                    for traj in p.trajectory_grid[string_idx]:
+                        times.append(phrase_start + (traj.start_time or 0.0))
+            return times
 
     def all_pitches(self, repetition: bool = True, pitch_number: bool = False, track: int = 0) -> List[Any]:
         pitches: List[Any] = []
@@ -1358,7 +1436,6 @@ class Piece:
             "name": self.name,
             "family_name": self.family_name,
             "given_name": self.given_name,
-            "sectionStartsGrid": self.section_starts_grid,
             "sectionCatGrid": self.section_cat_grid,
             "explicitPermissions": self.explicit_permissions,
             "soloist": self.soloist,

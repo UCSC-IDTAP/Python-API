@@ -53,37 +53,8 @@ class SegmentationType(str, Enum):
     CONNECTED_SEQUENCE_OF_TRAJECTORIES = "connectedSequenceOfTrajectories"
 
 
-# Section categorization types (matching TypeScript SecCatType)
-class SecCatType(TypedDict, total=False):
-    """Section categorization structure."""
-    # Pre-Chiz Alap section
-    pre_chiz_alap: Dict[str, bool]
-    
-    # Alap section types
-    alap: Dict[str, bool]
-    
-    # Composition types
-    composition_type: Dict[str, bool]
-    
-    # Tempo/section types
-    comp_section_tempo: Dict[str, bool]
-    
-    # Tala types
-    tala: Dict[str, bool]
-    
-    # Other categories
-    improvisation: Dict[str, bool]
-    other: Dict[str, bool]
-    
-    # Top level category
-    top_level: Literal[
-        "Pre-Chiz Alap", 
-        "Alap", 
-        "Composition", 
-        "Improvisation", 
-        "Other", 
-        "None"
-    ]
+# Section categorization type alias (matching piece.py and database format)
+SecCatType = Dict[str, Union[Dict[str, bool], str]]
 
 
 # Phrase categorization types (matching TypeScript PhraseCatType)
@@ -187,15 +158,14 @@ class MultipleOptionType(TypedDict, total=False):
 
 # Default categorization structures
 def init_sec_categorization() -> SecCatType:
-    """Initialize default section categorization structure."""
+    """Initialize default section categorization structure.
+
+    Keys use display-string format matching the database and piece.py.
+    """
     return {
-        "pre_chiz_alap": {"Pre-Chiz Alap": False},
-        "alap": {
-            "Alap": False,
-            "Jor": False,
-            "Alap-Jhala": False
-        },
-        "composition_type": {
+        "Pre-Chiz Alap": {"Pre-Chiz Alap": False},
+        "Alap": {"Alap": False, "Jor": False, "Alap-Jhala": False},
+        "Composition Type": {
             "Dhrupad": False,
             "Bandish": False,
             "Thumri": False,
@@ -210,7 +180,7 @@ def init_sec_categorization() -> SecCatType:
             "Razakhani Gat": False,
             "Ferozkhani Gat": False,
         },
-        "comp_section_tempo": {
+        "Comp.-section/Tempo": {
             "Ati Vilambit": False,
             "Vilambit": False,
             "Madhya": False,
@@ -218,14 +188,10 @@ def init_sec_categorization() -> SecCatType:
             "Ati Drut": False,
             "Jhala": False,
         },
-        "tala": {
-            "Ektal": False,
-            "Tintal": False,
-            "Rupak": False
-        },
-        "improvisation": {"Improvisation": False},
-        "other": {"Other": False},
-        "top_level": "None"
+        "Tala": {"Ektal": False, "Tintal": False, "Rupak": False},
+        "Improvisation": {"Improvisation": False},
+        "Other": {"Other": False},
+        "Top Level": "None",
     }
 
 
