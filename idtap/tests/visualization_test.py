@@ -217,16 +217,31 @@ class TestPlotPitchPatterns:
         assert fig is not None
         plt.close(fig)
 
-    def test_with_existing_axes(self):
-        fig, ax = plt.subplots()
+    def test_multiple_sizes(self):
         trajs = [
             _fixed_traj('sa', dur=1.0),
             _fixed_traj('re', dur=1.0),
+            _fixed_traj('ga', dur=1.0),
             _fixed_traj('sa', dur=1.0),
             _fixed_traj('re', dur=1.0),
+            _fixed_traj('ga', dur=1.0),
         ]
-        returned_fig = plot_pitch_patterns(trajs, pattern_size=2, ax=ax)
-        assert returned_fig is fig
+        fig = plot_pitch_patterns(trajs, pattern_sizes=[2, 3])
+        assert fig is not None
+        assert hasattr(fig, 'savefig')
+        plt.close(fig)
+
+    def test_with_contour_plot(self):
+        trajs = [
+            _fixed_traj('sa', dur=1.0),
+            _fixed_traj('re', dur=1.0),
+            _fixed_traj('ga', dur=1.0),
+            _fixed_traj('sa', dur=1.0),
+            _fixed_traj('re', dur=1.0),
+            _fixed_traj('ga', dur=1.0),
+        ]
+        fig = plot_pitch_patterns(trajs, pattern_size=2, plot=True)
+        assert fig is not None
         plt.close(fig)
 
     def test_max_patterns_limit(self):

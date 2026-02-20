@@ -61,6 +61,99 @@ def _pitch_sargam_label(pitch_number: int) -> str:
     return _CHROMA_SARGAM.get(chroma, str(pitch_number))
 
 
+_SARGAM_CHROMA = {v: k for k, v in _CHROMA_SARGAM.items()}
+
+
+def _text_contrast(hex_color: str) -> str:
+    """Return ``'white'`` or ``'black'`` for best readability on *hex_color*."""
+    r = int(hex_color[1:3], 16) / 255
+    g = int(hex_color[3:5], 16) / 255
+    b = int(hex_color[5:7], 16) / 255
+    luminance = 0.299 * r + 0.587 * g + 0.114 * b
+    return 'white' if luminance < 0.5 else 'black'
+
+
+def _pitch_chroma_index(pitch_val, output_type: str) -> Optional[int]:
+    """Map a pitch value to a chroma index (0–11) for colouring.
+
+    For sargam letters the case distinguishes raised/lowered (``'R'`` = raised
+    re → chroma 2, ``'r'`` = lowered re → chroma 1).  Octaved sargam letters
+    carry Unicode diacritics; only the first character is used for the lookup.
+    """
+    if isinstance(pitch_val, (int, float)):
+        c = int(pitch_val) % 12
+        return c if c >= 0 else c + 12
+    if isinstance(pitch_val, str) and len(pitch_val) > 0:
+        # Try full string first, then just the base letter (handles diacritics)
+        if pitch_val in _SARGAM_CHROMA:
+            return _SARGAM_CHROMA[pitch_val]
+        if pitch_val[0] in _SARGAM_CHROMA:
+            return _SARGAM_CHROMA[pitch_val[0]]
+    return None
+
+
+def _pattern_pitch_label(pitch_val, output_type: str) -> str:
+    """Label to show inside a pattern pitch box."""
+    if output_type in ('sargamLetter', 'octavedSargamLetter'):
+        return str(pitch_val)
+    if output_type == 'chroma' and isinstance(pitch_val, (int, float)):
+        return _CHROMA_SARGAM.get(int(pitch_val) % 12, str(pitch_val))
+    return str(pitch_val)
+
+
+def _draw_pattern_contour(
+    ax: 'Axes',
+    pattern: list,
+    output_type: str,
+    x_start: float,
+    y_bottom: float,
+    width: float,
+    height: float,
+) -> None:
+    """Draw an interpolated melodic contour curve below a pattern row."""
+    if output_type == 'chroma':
+        pitch_nums = chroma_seq_to_condensed_pitch_nums(
+            [int(p) for p in pattern])
+    elif output_type in ('pitchNumber', 'scaleDegree'):
+        pitch_nums = [int(p) for p in pattern]
+    else:
+        return  # contour not meaningful for string-based pitch types
+
+    if len(pitch_nums) < 2:
+        return
+
+    pitches = [Pitch.from_pitch_number(p) for p in pitch_nums]
+    traj = Trajectory({'id': 6, 'pitches': pitches})
+
+    n_samples = 50
+    xs = np.linspace(0, 0.999, n_samples)
+    log_freqs = [traj.compute(x, log_scale=True) for x in xs]
+
+    lf_min = min(log_freqs)
+    lf_max = max(log_freqs)
+    lf_range = lf_max - lf_min
+    if lf_range < 1e-10:
+        normalized = [0.5] * n_samples
+    else:
+        normalized = [(lf - lf_min) / lf_range for lf in log_freqs]
+
+    pad = 0.08 * height
+    draw_xs = [x_start + x * width for x in xs]
+    draw_ys = [y_bottom + pad + n * (height - 2 * pad) for n in normalized]
+
+    # Light reference lines for each unique pitch
+    unique_pitches = sorted(set(pitch_nums))
+    for p in unique_pitches:
+        p_obj = Pitch.from_pitch_number(p)
+        ref_lf = math.log2(p_obj.frequency)
+        ref_norm = 0.5 if lf_range < 1e-10 else (ref_lf - lf_min) / lf_range
+        ref_y = y_bottom + pad + ref_norm * (height - 2 * pad)
+        ax.plot([x_start, x_start + width], [ref_y, ref_y],
+                color='#D0D0D0', linewidth=0.4, zorder=1)
+
+    ax.plot(draw_xs, draw_ys, color='black', linewidth=1.0, zorder=2)
+
+
 def plot_melodic_contour(
     trajectories: List[Trajectory],
     raga: Optional['Raga'] = None,
@@ -718,27 +811,44 @@ def plot_pitch_prevalence(
 
 def plot_pitch_patterns(
     piece_or_trajs,
+    pattern_sizes: Optional[List[int]] = None,
     pattern_size: int = 3,
     max_patterns: int = 20,
     output_type: str = 'pitchNumber',
+    plot: bool = False,
+    segmentation: str = 'transcription',
+    segment_duration: float = 10,
+    min_count: int = 1,
+    target_pitch=None,
+    fade_time: float = 5,
     inst: int = 0,
-    ax: Optional['Axes'] = None,
-    figsize: Tuple[float, float] = (10, 6),
+    figsize: Optional[Tuple[float, float]] = None,
     title: Optional[str] = None,
 ) -> 'Figure':
     """Visualise the most common pitch N-gram patterns.
 
-    Mirrors the pattern analysis from the IDTAP web app's Analyzer component.
+    Mirrors the pattern analysis from the IDTAP web app's Analyzer component,
+    supporting multiple pattern sizes, segmentation modes, and optional
+    melodic contour curves rendered via ``Trajectory.compute``.
 
     Args:
         piece_or_trajs: Either a ``Piece`` (trajectories extracted from
             instrument *inst*) or an explicit list of Trajectories.
-        pattern_size: N-gram size.
-        max_patterns: Maximum number of patterns to display.
+        pattern_sizes: List of N-gram sizes to display (e.g. ``[2, 3, 4]``).
+            Overrides *pattern_size* when provided.
+        pattern_size: N-gram size (used when *pattern_sizes* is ``None``).
+        max_patterns: Maximum number of patterns to display per size.
         output_type: Pitch representation for pattern detection.
-        inst: Instrument index (used only when *piece_or_trajs* is a Piece).
-        ax: Existing Axes.
-        figsize: Figure size if creating new Figure.
+        plot: If ``True``, draw interpolated melodic contour curves below
+            each pattern row.
+        segmentation: How to segment the piece — ``'transcription'``
+            (whole piece), ``'section'``, ``'phrase'``, or ``'duration'``.
+        segment_duration: Segment length in seconds (``'duration'`` mode).
+        min_count: Minimum occurrence count to include a pattern.
+        target_pitch: If provided, only show patterns ending with this pitch.
+        fade_time: Maximum silence gap absorbed in pattern detection.
+        inst: Instrument index.
+        figsize: Figure size.  Auto-computed if ``None``.
         title: Optional title.
 
     Returns:
@@ -747,78 +857,207 @@ def plot_pitch_patterns(
     import matplotlib.pyplot as plt
     from matplotlib.patches import Rectangle
 
+    sizes = sorted(pattern_sizes if pattern_sizes is not None else [pattern_size])
+
+    # ------------------------------------------------------------------ #
+    # 1. Build segments                                                    #
+    # ------------------------------------------------------------------ #
+    segments: List[List[Trajectory]] = []
+    seg_labels: List[str] = []
+
     if isinstance(piece_or_trajs, list):
-        trajs = piece_or_trajs
+        segments = [piece_or_trajs]
+        seg_labels = ['']
     else:
-        trajs = piece_or_trajs.all_trajectories(inst)
-
-    patterns = pattern_counter(
-        trajs, size=pattern_size, output_type=output_type,
-    )
-    patterns = patterns[:max_patterns]
-
-    if not patterns:
-        own_fig = ax is None
-        if own_fig:
-            fig, ax = plt.subplots(figsize=figsize)
+        piece = piece_or_trajs
+        if segmentation == 'transcription':
+            segments = [piece.all_trajectories(inst)]
+            seg_labels = ['']
+        elif segmentation == 'section':
+            sections = piece.sections_grid[inst]
+            for sec_i, section in enumerate(sections):
+                trajs: List[Trajectory] = []
+                for phrase in section.phrases:
+                    trajs.extend(phrase.trajectory_grid[0])
+                segments.append(trajs)
+                sec_type = ''
+                cat = section.categorization
+                if cat:
+                    tl = cat.get('Top Level')
+                    if isinstance(tl, str) and tl != 'None':
+                        sec_type = tl
+                label = f'Section {sec_i + 1}'
+                if sec_type:
+                    label += f' \u2014 {sec_type}'
+                seg_labels.append(label)
+        elif segmentation == 'phrase':
+            phrases = piece.phrase_grid[inst]
+            for p_i, phrase in enumerate(phrases):
+                segments.append(list(phrase.trajectory_grid[0]))
+                seg_labels.append(f'Phrase {p_i + 1}')
+        elif segmentation == 'duration':
+            segments = segment_by_duration(
+                piece, duration=segment_duration, inst=inst)
+            for i in range(len(segments)):
+                seg_labels.append(_display_time(i * segment_duration))
         else:
-            fig = ax.figure  # type: ignore[union-attr]
-        ax.text(0.5, 0.5, 'No patterns found', transform=ax.transAxes,  # type: ignore[union-attr]
+            raise ValueError(f'Unknown segmentation: {segmentation}')
+
+    # ------------------------------------------------------------------ #
+    # 2. Run pattern_counter per segment per size                          #
+    # ------------------------------------------------------------------ #
+    seg_data: List[Dict] = []
+    for seg_trajs, seg_lbl in zip(segments, seg_labels):
+        size_results: Dict[int, List[Dict]] = {}
+        for sz in sizes:
+            pats = pattern_counter(
+                seg_trajs, size=sz, output_type=output_type,
+                target_pitch=target_pitch, min_size=min_count,
+            )
+            size_results[sz] = pats[:max_patterns]
+        seg_data.append({'label': seg_lbl, 'sizes': size_results})
+
+    has_any = any(
+        pats for sd in seg_data for pats in sd['sizes'].values() if pats)
+    if not has_any:
+        fig, ax = plt.subplots(figsize=figsize or (10, 4))
+        ax.text(0.5, 0.5, 'No patterns found', transform=ax.transAxes,
                 ha='center', va='center')
+        ax.axis('off')
         return fig
 
-    own_fig = ax is None
-    if own_fig:
-        fig, ax = plt.subplots(figsize=figsize)
-    else:
-        fig = ax.figure  # type: ignore[union-attr]
+    # ------------------------------------------------------------------ #
+    # 3. Compact layout — 1 data unit = 1 inch (equal aspect)             #
+    # ------------------------------------------------------------------ #
+    cell_w = 0.22       # inches per pitch cell
+    cell_h = 0.16       # inches per row
+    count_gap = 0.03    # gap before count cell
+    count_w = 0.26      # count cell width
+    contour_h = 0.40 if plot else 0
+    row_h = cell_h + contour_h
+    seg_gap = 0.20
+    size_gap = 0.12
+    title_space = 0.30 if title else 0.08
+    seg_label_h = 0.18
+    size_label_h = 0.14
 
-    n_patterns = len(patterns)
-    cell_h = 0.8
-    cell_w = 1.0
+    max_sz = max(sizes)
+    content_w = max_sz * cell_w + count_gap + count_w
 
-    for row_idx, pat in enumerate(reversed(patterns)):
-        y = row_idx
-        for col_idx, pitch_val in enumerate(pat['pattern']):
-            if isinstance(pitch_val, (int, float)):
-                color_idx = int(pitch_val) % 12
-                color = CHROMA_COLORS[color_idx]
-            else:
-                color = '#cccccc'
-            rect = Rectangle(
-                (col_idx * cell_w, y + (1 - cell_h) / 2),
-                cell_w * 0.9, cell_h,
-                facecolor=color, edgecolor='white', linewidth=0.5,
-            )
-            ax.add_patch(rect)  # type: ignore[union-attr]
-            ax.text(  # type: ignore[union-attr]
-                col_idx * cell_w + cell_w * 0.45,
-                y + 0.5,
-                str(pitch_val),
-                ha='center', va='center',
-                fontsize=7, color='white', fontweight='bold',
-            )
+    # Total height
+    total_h = title_space
+    for si_seg, sd in enumerate(seg_data):
+        if sd['label']:
+            total_h += seg_label_h
+        for si_sz, sz in enumerate(sizes):
+            pats = sd['sizes'][sz]
+            if not pats:
+                continue
+            if len(sizes) > 1:
+                total_h += size_label_h
+            total_h += len(pats) * row_h
+            if si_sz < len(sizes) - 1:
+                total_h += size_gap
+        if si_seg < len(seg_data) - 1:
+            total_h += seg_gap
+    total_h += 0.10
 
-        # Count label
-        ax.text(  # type: ignore[union-attr]
-            pattern_size * cell_w + 0.3,
-            y + 0.5,
-            f'×{pat["count"]}',
-            ha='left', va='center', fontsize=9,
-        )
+    # Figure = content size + small margin (1 data unit = 1 inch)
+    pad = 0.15
+    if figsize is None:
+        figsize = (content_w + 2 * pad, total_h + 2 * pad)
 
-    ax.set_xlim(-0.1, pattern_size * cell_w + 1.5)  # type: ignore[union-attr]
-    ax.set_ylim(-0.1, n_patterns + 0.1)  # type: ignore[union-attr]
-    ax.set_yticks([])  # type: ignore[union-attr]
-    ax.set_xticks([])  # type: ignore[union-attr]
-    ax.set_aspect('equal')  # type: ignore[union-attr]
-    ax.set_xlabel(f'{pattern_size}-gram patterns (most common)')  # type: ignore[union-attr]
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.set_xlim(-pad, content_w + pad)
+    ax.set_ylim(-pad, total_h + pad)
+    ax.set_aspect('equal')
+    ax.axis('off')
 
+    # ------------------------------------------------------------------ #
+    # 4. Draw title                                                        #
+    # ------------------------------------------------------------------ #
+    y_cursor = total_h
     if title:
-        ax.set_title(title)  # type: ignore[union-attr]
+        ax.text(content_w / 2, y_cursor, title,
+                ha='center', va='top', fontsize=8, fontweight='bold')
+    y_cursor -= title_space
 
-    if own_fig:
-        fig.tight_layout()
+    # ------------------------------------------------------------------ #
+    # 5. Draw compact table rows                                           #
+    # ------------------------------------------------------------------ #
+    for si_seg, sd in enumerate(seg_data):
+        if sd['label']:
+            ax.text(0, y_cursor, sd['label'],
+                    ha='left', va='top', fontsize=5.5, fontweight='bold',
+                    color='#333333')
+            y_cursor -= seg_label_h
+
+        for si_sz, sz in enumerate(sizes):
+            pats = sd['sizes'][sz]
+            if not pats:
+                continue
+
+            if len(sizes) > 1:
+                ax.text(0, y_cursor - 0.01, f'{sz}-gram',
+                        ha='left', va='top', fontsize=4.5, style='italic',
+                        color='#666666')
+                y_cursor -= size_label_h
+
+            for pat in pats:
+                pattern = pat['pattern']
+                count = pat['count']
+                n_pitches = len(pattern)
+
+                # --- pitch cells (edge-to-edge) ---
+                for pi, pval in enumerate(pattern):
+                    x = pi * cell_w
+                    y = y_cursor - cell_h
+
+                    cidx = _pitch_chroma_index(pval, output_type)
+                    color = CHROMA_COLORS[cidx] if cidx is not None else '#cccccc'
+                    tc = _text_contrast(color)
+
+                    rect = Rectangle(
+                        (x, y), cell_w, cell_h,
+                        facecolor=color,
+                        edgecolor='white', linewidth=0.3,
+                    )
+                    ax.add_patch(rect)
+
+                    lbl = _pattern_pitch_label(pval, output_type)
+                    ax.text(x + cell_w / 2, y + cell_h / 2, lbl,
+                            ha='center', va='center',
+                            fontsize=5, color=tc, fontweight='bold')
+
+                # --- count cell (right after last pitch) ---
+                cx = n_pitches * cell_w + count_gap
+                cy = y_cursor - cell_h
+                crect = Rectangle(
+                    (cx, cy), count_w, cell_h,
+                    facecolor='black', edgecolor='white', linewidth=0.3,
+                )
+                ax.add_patch(crect)
+                ax.text(cx + count_w / 2, cy + cell_h / 2,
+                        str(count), ha='center', va='center',
+                        fontsize=5, color='white', fontweight='bold')
+
+                # --- contour curve ---
+                if plot and all(isinstance(p, (int, float)) for p in pattern):
+                    _draw_pattern_contour(
+                        ax, pattern, output_type,
+                        x_start=0,
+                        y_bottom=y_cursor - cell_h - contour_h,
+                        width=n_pitches * cell_w,
+                        height=contour_h * 0.92,
+                    )
+
+                y_cursor -= row_h
+
+            if si_sz < len(sizes) - 1:
+                y_cursor -= size_gap
+
+        if si_seg < len(seg_data) - 1:
+            y_cursor -= seg_gap
 
     return fig
 

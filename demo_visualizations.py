@@ -9,7 +9,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 from idtap import SwaraClient, Piece
-from idtap.visualization import plot_pitch_prevalence
+from idtap.visualization import plot_pitch_prevalence, plot_pitch_patterns
 
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), 'demo_output')
 os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -179,6 +179,55 @@ def main():
         print(f"  [{label}] {desc}...", end=' ', flush=True)
         try:
             fig = plot_pitch_prevalence(piece, title=piece_title, **kwargs)
+            path = os.path.join(OUTPUT_DIR, f'{label}.png')
+            fig.savefig(path, dpi=300, bbox_inches='tight',
+                        pad_inches=0.2, facecolor='white', edgecolor='none')
+            plt.close(fig)
+            print(f"OK → {path}")
+        except Exception as e:
+            print(f"FAILED: {e}")
+            import traceback
+            traceback.print_exc()
+
+    # ------------------------------------------------------------------
+    # Pitch pattern visualizations
+    # ------------------------------------------------------------------
+    pattern_configs = [
+        {
+            'label': '13_patterns_3gram',
+            'desc': 'Patterns / 3-gram / pitchNumber',
+            'kwargs': dict(pattern_size=3, output_type='pitchNumber'),
+        },
+        {
+            'label': '14_patterns_3gram_plot',
+            'desc': 'Patterns / 3-gram / pitchNumber / contour',
+            'kwargs': dict(pattern_size=3, output_type='pitchNumber', plot=True),
+        },
+        {
+            'label': '15_patterns_multi_section',
+            'desc': 'Patterns / [2,3,4]-gram / section segmentation',
+            'kwargs': dict(
+                pattern_sizes=[2, 3, 4], segmentation='section',
+                output_type='pitchNumber', max_patterns=10,
+            ),
+        },
+        {
+            'label': '16_patterns_sargam',
+            'desc': 'Patterns / 3-gram / sargamLetter',
+            'kwargs': dict(pattern_size=3, output_type='sargamLetter'),
+        },
+    ]
+
+    print(f"\nGenerating {len(pattern_configs)} pattern visualizations...\n")
+
+    for cfg in pattern_configs:
+        label = cfg['label']
+        desc = cfg['desc']
+        kwargs = cfg['kwargs']
+
+        print(f"  [{label}] {desc}...", end=' ', flush=True)
+        try:
+            fig = plot_pitch_patterns(piece, title=piece_title, **kwargs)
             path = os.path.join(OUTPUT_DIR, f'{label}.png')
             fig.savefig(path, dpi=300, bbox_inches='tight',
                         pad_inches=0.2, facecolor='white', edgecolor='none')
