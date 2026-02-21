@@ -911,10 +911,8 @@ class Trajectory:
             'articulations': {k: a.to_json() for k, a in self.articulations.items()},
             'startTime': self.start_time,
             'num': self.num,
-            'name': self.name,
             'fundID12': self.fund_id12,
             'vibObj': self.vib_obj,
-            'instrumentation': self.instrumentation.value if isinstance(self.instrumentation, Instrument) else self.instrumentation,
             'vowel': self.vowel,
             'startConsonant': self.start_consonant,
             'startConsonantHindi': self.start_consonant_hindi,
@@ -927,15 +925,15 @@ class Trajectory:
             'groupId': self.group_id,
             'automation': self.automation.to_json() if self.automation else None,
             'uniqueId': self.unique_id,
-            'tags': self.tags,
         }
         # drop None values so they serialize as undefined (omitted) rather than null
         return {k: v for k, v in data.items() if v is not None}
 
     @staticmethod
-    def from_json(obj: Dict) -> 'Trajectory':
+    def from_json(obj: Dict, ratios=None, fundamental=None) -> 'Trajectory':
         opts = humps.decamelize(obj)
-        pitches = [Pitch.from_json(p) for p in opts.get('pitches', [])]
+        pitches = [Pitch.from_json(p, ratios=ratios, fundamental=fundamental)
+                   for p in opts.get('pitches', [])]
         arts = {}
         for k,v in opts.get('articulations', {}).items():
             if v is not None:
