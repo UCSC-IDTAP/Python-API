@@ -371,8 +371,8 @@ class Piece:
         if 'collections' in opts and opts['collections'] is not None:
             if not isinstance(opts['collections'], list):
                 raise TypeError(f"Parameter 'collections' must be a list, got {type(opts['collections']).__name__}")
-            if not all(isinstance(item, str) for item in opts['collections']):
-                raise TypeError("All items in 'collections' must be strings")
+            if not all(isinstance(item, str) or item is None for item in opts['collections']):
+                raise TypeError("All items in 'collections' must be strings or None")
 
         # Validate trackTitles
         if 'trackTitles' in opts and opts['trackTitles'] is not None:
@@ -1451,12 +1451,19 @@ class Piece:
     @staticmethod
     def from_json(obj: Dict[str, Any]) -> "Piece":
         new_obj = dict(obj)
+        raga = None
         if "raga" in new_obj:
-            new_obj["raga"] = Raga.from_json(new_obj["raga"])
+            raga = Raga.from_json(new_obj["raga"])
+            new_obj["raga"] = raga
+
+        # Extract raga context for threading down to pitches
+        ratios = raga.stratified_ratios if raga else None
+        fundamental = raga.fundamental if raga else None
+
         if "phraseGrid" in new_obj:
             pg = []
             for row in new_obj["phraseGrid"]:
-                phrase_row = [Phrase.from_json(p) for p in row]
+                phrase_row = [Phrase.from_json(p, ratios=ratios, fundamental=fundamental) for p in row]
                 pg.append(phrase_row)
             # reconstruct groups so they reference existing trajectories
             for row in pg:
@@ -1465,6 +1472,8 @@ class Piece:
                     for g_list in phrase.groups_grid:
                         rebuilt: List[Group] = []
                         for g in g_list:
+                            if isinstance(g, str):
+                                continue  # skip bare ID strings
                             data = g if isinstance(g, dict) else g.to_json()
                             trajs = []
                             for t in data.get("trajectories", []):
@@ -1493,6 +1502,20 @@ class Piece:
             if isinstance(dm, dict) and "$date" in dm:
                 dm = dm["$date"]
             new_obj["dateModified"] = datetime.fromisoformat(str(dm).replace('Z',''))
+
+        # Strip keys not recognized by the constructor (e.g. server-only
+        # fields like 'userId' that are not part of the data model).
+        allowed = {
+            'raga', 'instrumentation', 'phraseGrid', 'phrases', 'title',
+            'dateCreated', 'dateModified', 'location', '_id', 'audioID',
+            'audio_DB_ID', 'userID', 'name', 'family_name', 'given_name',
+            'permissions', 'soloist', 'soloInstrument', 'explicitPermissions',
+            'meters', 'sectionStartsGrid', 'sectionStarts', 'sectionCatGrid',
+            'sectionCategorization', 'adHocSectionCatGrid', 'excerptRange',
+            'assemblageDescriptors', 'collections', 'durTot', 'durArrayGrid',
+            'durArray', 'trackTitles',
+        }
+        new_obj = {k: v for k, v in new_obj.items() if k in allowed}
 
         piece = Piece(new_obj)
 

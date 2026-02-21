@@ -38,8 +38,6 @@ def test_default_pitch():
         'swara': 0,
         'raised': True,
         'oct': 0,
-        'ratios': ratios,
-        'fundamental': 261.63,
         'logOffset': 0,
     }
 

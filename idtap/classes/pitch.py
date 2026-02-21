@@ -203,8 +203,6 @@ class Pitch:
             'swara': self.swara,
             'raised': self.raised,
             'oct': self.oct,
-            'ratios': self.ratios,
-            'fundamental': self.fundamental,
             'logOffset': self.log_offset,
         } 
 
@@ -391,5 +389,10 @@ class Pitch:
         return self.swara == other.swara and self.oct == other.oct and self.raised == other.raised
 
     @classmethod
-    def from_json(cls, obj: dict) -> "Pitch":
-        return cls(obj)
+    def from_json(cls, obj: dict, ratios=None, fundamental=None) -> "Pitch":
+        opts = dict(obj)
+        if ratios is not None:
+            opts['ratios'] = ratios
+        if fundamental is not None:
+            opts['fundamental'] = fundamental
+        return cls(opts)
