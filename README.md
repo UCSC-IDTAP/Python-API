@@ -1,3 +1,9 @@
+> [!IMPORTANT]
+> **This repository is archived.** Development of the `idtap` Python client has moved to
+> **[jon-myers/Python-API](https://github.com/jon-myers/Python-API)**. Install with
+> `pip install idtap` — PyPI releases now come from the new repository. This copy is kept
+> for historical reference and is no longer maintained.
+
 # IDTAP Python API
 
 [![PyPI version](https://badge.fury.io/py/idtap.svg)](https://badge.fury.io/py/idtap)
